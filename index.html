@@ -1,0 +1,404 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  deleteDoc, 
+  updateDoc,
+  serverTimestamp,
+  addDoc,
+  query,
+  limit
+} from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithCustomToken, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+
+// --- Firebase Configuration ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'neon-quest-rpg';
+
+const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [players, setPlayers] = useState({});
+  const [orbs, setOrbs] = useState({});
+  const [messages, setMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [username, setUsername] = useState(`Explorer-${Math.floor(Math.random() * 1000)}`);
+  const [gameStarted, setGameStarted] = useState(false);
+  
+  // Player Stats
+  const [level, setLevel] = useState(1);
+  const [xp, setXp] = useState(0);
+  
+  const canvasRef = useRef(null);
+  const playerRef = useRef({
+    x: Math.random() * 600 + 100,
+    y: Math.random() * 400 + 100,
+    angle: 0,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    lastUpdate: Date.now(),
+    level: 1,
+    xp: 0
+  });
+
+  const keys = useRef({});
+  const joystickRef = useRef({ active: false, x: 0, y: 0 });
+
+  // 1. Authentication
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth error:", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Multi-device Synchronization
+  useEffect(() => {
+    if (!user || !gameStarted) return;
+
+    const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
+    const orbsRef = collection(db, 'artifacts', appId, 'public', 'data', 'orbs');
+    const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
+    
+    // Set initial player data
+    const playerDoc = doc(playersRef, user.uid);
+    setDoc(playerDoc, {
+      id: user.uid,
+      name: username,
+      color: playerRef.current.color,
+      x: playerRef.current.x,
+      y: playerRef.current.y,
+      level: 1,
+      xp: 0,
+      lastActive: serverTimestamp()
+    });
+
+    // Spawn an orb if none exist (simple logic)
+    const spawnInitialOrbs = async () => {
+       for(let i=0; i<5; i++) {
+         await addDoc(orbsRef, {
+           x: Math.random() * 750 + 25,
+           y: Math.random() * 550 + 25,
+           value: 10
+         });
+       }
+    };
+
+    // Listen to players
+    const unsubPlayers = onSnapshot(playersRef, (snapshot) => {
+      const p = {};
+      snapshot.forEach((doc) => {
+        if (doc.id !== user.uid) p[doc.id] = doc.data();
+      });
+      setPlayers(p);
+    }, (err) => console.error(err));
+
+    // Listen to orbs
+    const unsubOrbs = onSnapshot(orbsRef, (snapshot) => {
+      const o = {};
+      snapshot.forEach((doc) => o[doc.id] = { id: doc.id, ...doc.data() });
+      setOrbs(o);
+      if (snapshot.empty) spawnInitialOrbs();
+    });
+
+    // Listen to chat
+    const unsubChat = onSnapshot(query(chatRef), (snapshot) => {
+      const msgs = [];
+      snapshot.forEach((doc) => msgs.push(doc.data()));
+      // Sort in memory by time (Rule 2: No complex queries)
+      msgs.sort((a, b) => b.timestamp?.seconds - a.timestamp?.seconds);
+      setMessages(msgs.slice(0, 10));
+    });
+
+    return () => {
+      unsubPlayers();
+      unsubOrbs();
+      unsubChat();
+      deleteDoc(playerDoc);
+    };
+  }, [user, gameStarted]);
+
+  // 3. Game Loop & Logic
+  useEffect(() => {
+    if (!gameStarted) return;
+
+    let animationFrame;
+    const update = () => {
+      const p = playerRef.current;
+      let moved = false;
+
+      const speed = 2 + (p.level * 0.2); // Speed increases with level
+
+      if (keys.current['ArrowUp'] || keys.current['w']) { p.y -= speed; moved = true; }
+      if (keys.current['ArrowDown'] || keys.current['s']) { p.y += speed; moved = true; }
+      if (keys.current['ArrowLeft'] || keys.current['a']) { p.x -= speed; moved = true; }
+      if (keys.current['ArrowRight'] || keys.current['d']) { p.x += speed; moved = true; }
+
+      if (joystickRef.current.active) {
+        const angle = Math.atan2(joystickRef.current.y, joystickRef.current.x);
+        p.x += Math.cos(angle) * speed;
+        p.y += Math.sin(angle) * speed;
+        moved = true;
+      }
+
+      // Boundaries
+      p.x = Math.max(20, Math.min(780, p.x));
+      p.y = Math.max(20, Math.min(580, p.y));
+
+      // Collision Detection (Orbs)
+      Object.values(orbs).forEach(orb => {
+        const dx = p.x - orb.x;
+        const dy = p.y - orb.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 20) {
+          collectOrb(orb);
+        }
+      });
+
+      // Throttled Update
+      const now = Date.now();
+      if (moved && now - p.lastUpdate > 60 && user) {
+        p.lastUpdate = now;
+        const playerDoc = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+        updateDoc(playerDoc, {
+          x: p.x,
+          y: p.y,
+          level: p.level,
+          xp: p.xp,
+          lastActive: serverTimestamp()
+        }).catch(() => {});
+      }
+
+      draw();
+      animationFrame = requestAnimationFrame(update);
+    };
+
+    const collectOrb = async (orb) => {
+      const p = playerRef.current;
+      p.xp += orb.value;
+      if (p.xp >= p.level * 50) {
+        p.level += 1;
+        p.xp = 0;
+        setLevel(p.level);
+      }
+      setXp(p.xp);
+      
+      // Remove collected orb and spawn new one
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orbs', orb.id));
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orbs'), {
+        x: Math.random() * 750 + 25,
+        y: Math.random() * 550 + 25,
+        value: 10
+      });
+    };
+
+    const draw = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Background Grid
+      ctx.strokeStyle = '#0f172a';
+      for(let i=0; i<800; i+=50) {
+        ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,600); ctx.stroke();
+      }
+      for(let i=0; i<600; i+=50) {
+        ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(800,i); ctx.stroke();
+      }
+
+      // Draw Orbs
+      Object.values(orbs).forEach(orb => {
+        ctx.fillStyle = '#fbbf24';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, 6, 0, Math.PI*2);
+        ctx.fill();
+      });
+
+      // Draw Other Players
+      Object.values(players).forEach(p => drawAvatar(ctx, p, false));
+
+      // Draw Local Player
+      drawAvatar(ctx, { ...playerRef.current, name: username }, true);
+    };
+
+    const drawAvatar = (ctx, data, isLocal) => {
+      ctx.save();
+      ctx.translate(data.x, data.y);
+      
+      // Level Aura
+      ctx.beginPath();
+      ctx.strokeStyle = data.color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.arc(0, 0, 15 + (data.level || 1), 0, Math.PI*2);
+      ctx.stroke();
+
+      // Body
+      ctx.fillStyle = data.color;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = data.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI*2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // UI Text
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 12px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${data.name} (Lv.${data.level || 1})`, data.x, data.y - 25);
+    };
+
+    window.addEventListener('keydown', (e) => keys.current[e.key] = true);
+    window.addEventListener('keyup', (e) => keys.current[e.key] = false);
+    update();
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+    };
+  }, [gameStarted, orbs, players, user]);
+
+  const sendChatMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !user) return;
+    const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
+    await addDoc(chatRef, {
+      sender: username,
+      text: chatInput,
+      timestamp: serverTimestamp()
+    });
+    setChatInput('');
+  };
+
+  if (!gameStarted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-950 text-white font-sans">
+        <div className="p-10 bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl w-96 text-center">
+          <h1 className="text-4xl font-black mb-2 tracking-tight">NEON <span className="text-blue-500">QUEST</span></h1>
+          <p className="text-slate-500 text-sm mb-8">Multiplayer Adventure RPG</p>
+          <input 
+            className="w-full bg-slate-800 p-4 rounded-xl mb-4 border border-slate-700 outline-none focus:border-blue-500 transition-colors"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="Choose your name"
+          />
+          <button 
+            onClick={() => setGameStarted(true)}
+            className="w-full bg-blue-600 p-4 rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/40"
+          >
+            Enter Realm
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden select-none">
+      {/* Sidebar: Stats & Chat */}
+      <div className="w-80 border-r border-slate-800 flex flex-col bg-slate-900/50">
+        <div className="p-6 border-b border-slate-800 bg-slate-900/80">
+          <h2 className="text-xl font-bold mb-4">Character</h2>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-xs font-bold uppercase text-slate-500 mb-1">
+                <span>Level {level}</span>
+                <span>{xp} / {level * 50} XP</span>
+              </div>
+              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 transition-all duration-300" 
+                  style={{ width: `${(xp / (level * 50)) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-grow flex flex-col p-4 overflow-hidden">
+          <h3 className="text-xs font-bold uppercase text-slate-500 mb-4">Global Chat</h3>
+          <div className="flex-grow overflow-y-auto space-y-3 mb-4 scrollbar-hide">
+            {messages.map((m, i) => (
+              <div key={i} className="text-sm">
+                <span className="font-bold text-blue-400">{m.sender}: </span>
+                <span className="text-slate-300">{m.text}</span>
+              </div>
+            ))}
+          </div>
+          <form onSubmit={sendChatMessage} className="flex gap-2">
+            <input 
+              className="flex-grow bg-slate-800 rounded-lg px-3 py-2 text-sm border border-slate-700 focus:border-blue-500 outline-none"
+              placeholder="Say hello..."
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+            />
+            <button className="bg-slate-800 p-2 rounded-lg hover:bg-slate-700">🚀</button>
+          </form>
+        </div>
+      </div>
+
+      {/* Game View */}
+      <div className="flex-grow relative bg-black flex items-center justify-center p-4">
+        <canvas 
+          ref={canvasRef}
+          width={800}
+          height={600}
+          className="max-w-full max-h-full aspect-[4/3] rounded-xl border border-slate-800 shadow-2xl"
+          onTouchStart={e => {
+            const t = e.touches[0];
+            joystickRef.current = { active: true, startX: t.clientX, startY: t.clientY, x: 0, y: 0 };
+          }}
+          onTouchMove={e => {
+            if (!joystickRef.current.active) return;
+            const t = e.touches[0];
+            joystickRef.current.x = t.clientX - joystickRef.current.startX;
+            joystickRef.current.y = t.clientY - joystickRef.current.startY;
+          }}
+          onTouchEnd={() => joystickRef.current.active = false}
+        />
+        
+        <div className="absolute top-8 right-8 bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-xs">
+          <div className="font-bold mb-2">Players in Realm</div>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span>{username}</span>
+            </div>
+            {Object.values(players).map(p => (
+              <div key={p.id} className="flex items-center gap-2 text-slate-400">
+                <div className="w-2 h-2 rounded-full bg-slate-600"></div>
+                <span>{p.name} (Lv.{p.level})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
