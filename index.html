@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>High-Population Attraction Sim</title>
+    <title>funy dot gam</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -36,14 +36,13 @@
         }
         .rule-cell {
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.1s ease;
             user-select: none;
             font-size: 9px;
             padding: 6px 0;
         }
         .rule-cell:hover {
             filter: brightness(1.5);
-            transform: scale(1.05);
         }
         .controls::-webkit-scrollbar {
             width: 4px;
@@ -77,93 +76,48 @@
 
     <div id="controlPanel" class="controls shadow-2xl">
         <div class="flex justify-between items-start mb-1">
-            <h1 class="text-white font-bold text-xl mb-2">Color Dynamics</h1>
+            <h1 class="text-white font-bold text-xl mb-2">changer place</h1>
         </div>
         
         <div class="hide-when-collapsed">
             <!-- Species Toggles -->
             <div class="mb-4">
-                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-3">Active Species</h2>
+                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-3">mess with stuff</h2>
                 <div class="grid grid-cols-3 gap-2">
-                    <label class="species-toggle text-blue-400 text-[11px]">
+                    <label class="species-toggle text-[#00FFFF] text-[11px]">
                         <input type="checkbox" id="check-blue" checked onchange="handleSpeciesToggle()"> Blue
                     </label>
-                    <label class="species-toggle text-red-400 text-[11px]">
+                    <label class="species-toggle text-[#FF3131] text-[11px]">
                         <input type="checkbox" id="check-red" checked onchange="handleSpeciesToggle()"> Red
                     </label>
-                    <label class="species-toggle text-green-400 text-[11px]">
+                    <label class="species-toggle text-[#39FF14] text-[11px]">
                         <input type="checkbox" id="check-green" checked onchange="handleSpeciesToggle()"> Green
                     </label>
-                    <label class="species-toggle text-yellow-400 text-[11px]">
+                    <label class="species-toggle text-[#FFF01F] text-[11px]">
                         <input type="checkbox" id="check-yellow" checked onchange="handleSpeciesToggle()"> Yellow
                     </label>
-                    <label class="species-toggle text-purple-300 text-[11px]">
+                    <label class="species-toggle text-[#BC13FE] text-[11px]">
                         <input type="checkbox" id="check-purple" checked onchange="handleSpeciesToggle()"> Purple
                     </label>
-                    <label class="species-toggle text-orange-400 text-[11px]">
+                    <label class="species-toggle text-[#FF5F1F] text-[11px]">
                         <input type="checkbox" id="check-orange" checked onchange="handleSpeciesToggle()"> Orange
                     </label>
                 </div>
             </div>
 
             <div class="mb-4 bg-black/40 rounded-lg p-4 border border-white/10">
-                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-3">Rule Editor (Actor → Target)</h2>
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-[10px] lowercase tracking-widest text-gray-500 font-bold">behaviors (Actor → Target)</h2>
+                    <button onclick="randomizeRules()" class="text-[9px] px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded uppercase font-bold tracking-tighter">Randomize</button>
+                </div>
                 <div id="ruleGrid" class="grid grid-cols-7 gap-1 text-[8px] text-center items-center">
                     <div class="text-gray-500">Actor\Target</div>
-                    <div class="text-blue-400 font-bold">Blu</div>
-                    <div class="text-red-400 font-bold">Red</div>
-                    <div class="text-green-400 font-bold">Grn</div>
-                    <div class="text-yellow-400 font-bold">Yel</div>
-                    <div class="text-purple-300 font-bold">Pur</div>
-                    <div class="text-orange-400 font-bold">Org</div>
-                    
-                    <div class="text-blue-400 font-bold text-left">Blue</div>
-                    <div id="rule-blue-blue" class="rule-cell bg-blue-900/40 rounded" onclick="toggleRule('blue', 'blue')">Stick</div>
-                    <div id="rule-blue-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('blue', 'red')">Flee</div>
-                    <div id="rule-blue-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('blue', 'green')">Flee</div>
-                    <div id="rule-blue-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('blue', 'yellow')">None</div>
-                    <div id="rule-blue-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('blue', 'purple')">Chase</div>
-                    <div id="rule-blue-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('blue', 'orange')">None</div>
-
-                    <div class="text-red-400 font-bold text-left">Red</div>
-                    <div id="rule-red-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('red', 'blue')">Chase</div>
-                    <div id="rule-red-red" class="rule-cell bg-red-900/40 rounded" onclick="toggleRule('red', 'red')">Stick</div>
-                    <div id="rule-red-green" class="rule-cell bg-gray-800 text-gray-500 rounded" onclick="toggleRule('red', 'green')">None</div>
-                    <div id="rule-red-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('red', 'yellow')">Flee</div>
-                    <div id="rule-red-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('red', 'purple')">None</div>
-                    <div id="rule-red-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('red', 'orange')">Chase</div>
-
-                    <div class="text-green-400 font-bold text-left">Green</div>
-                    <div id="rule-green-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('green', 'blue')">Chase</div>
-                    <div id="rule-green-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('green', 'red')">Flee</div>
-                    <div id="rule-green-green" class="rule-cell bg-green-900/40 rounded" onclick="toggleRule('green', 'green')">Stick</div>
-                    <div id="rule-green-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('green', 'yellow')">Chase</div>
-                    <div id="rule-green-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('green', 'purple')">Flee</div>
-                    <div id="rule-green-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('green', 'orange')">Stick</div>
-
-                    <div class="text-yellow-400 font-bold text-left">Yellow</div>
-                    <div id="rule-yellow-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('yellow', 'blue')">None</div>
-                    <div id="rule-yellow-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('yellow', 'red')">Chase</div>
-                    <div id="rule-yellow-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('yellow', 'green')">Flee</div>
-                    <div id="rule-yellow-yellow" class="rule-cell bg-yellow-900/40 rounded" onclick="toggleRule('yellow', 'yellow')">Stick</div>
-                    <div id="rule-yellow-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('yellow', 'purple')">Chase</div>
-                    <div id="rule-yellow-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('yellow', 'orange')">Flee</div>
-
-                    <div class="text-purple-300 font-bold text-left">Purple</div>
-                    <div id="rule-purple-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('purple', 'blue')">Flee</div>
-                    <div id="rule-purple-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('purple', 'red')">Chase</div>
-                    <div id="rule-purple-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('purple', 'green')">Chase</div>
-                    <div id="rule-purple-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('purple', 'yellow')">Flee</div>
-                    <div id="rule-purple-purple" class="rule-cell bg-purple-900/40 rounded" onclick="toggleRule('purple', 'purple')">Stick</div>
-                    <div id="rule-purple-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('purple', 'orange')">None</div>
-
-                    <div class="text-orange-400 font-bold text-left">Orange</div>
-                    <div id="rule-orange-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('orange', 'blue')">Chase</div>
-                    <div id="rule-orange-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('orange', 'red')">None</div>
-                    <div id="rule-orange-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('orange', 'green')">Flee</div>
-                    <div id="rule-orange-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('orange', 'yellow')">Chase</div>
-                    <div id="rule-orange-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('orange', 'purple')">Flee</div>
-                    <div id="rule-orange-orange" class="rule-cell bg-orange-900/40 rounded" onclick="toggleRule('orange', 'orange')">Stick</div>
+                    <div class="text-[#00FFFF] font-bold">Blu</div>
+                    <div class="text-[#FF3131] font-bold">Red</div>
+                    <div class="text-[#39FF14] font-bold">Grn</div>
+                    <div class="text-[#FFF01F] font-bold">Yel</div>
+                    <div class="text-[#BC13FE] font-bold">Pur</div>
+                    <div class="text-[#FF5F1F] font-bold">Org</div>
                 </div>
             </div>
         </div>
@@ -175,33 +129,29 @@
                 </button>
                 <div class="flex gap-2 hide-when-collapsed">
                     <button id="neonToggle" class="flex-1 py-2 border border-purple-500 text-purple-400 hover:bg-purple-900/20 transition-colors rounded text-xs font-bold uppercase">
-                        Neon: Off
-                    </button>
-                    <button id="hullToggle" class="flex-1 py-2 border border-gray-600 hover:bg-gray-800 transition-colors rounded text-xs font-bold uppercase">
-                        Hull: Off
+                        Glow: Off (will cause lag :( )
                     </button>
                 </div>
             </div>
 
-            <!-- Side-by-side sliders -->
             <div class="hide-when-collapsed grid grid-cols-2 gap-x-6 gap-y-4">
                 <div>
-                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">Dots/Color: <span id="countVal" class="text-white">100</span></label>
-                    <input type="range" id="particleCount" min="2" max="500" step="10" value="100" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">dots per color: <span id="countVal" class="text-white">100</span></label>
+                    <input type="range" id="particleCount" min="10" max="600" step="10" value="100" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
                 
                 <div>
-                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">Strength: <span id="strengthVal" class="text-white">0.050</span></label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">strength: <span id="strengthVal" class="text-white">0.050</span></label>
                     <input type="range" id="attractionStrength" min="0" max="0.2" step="0.001" value="0.05" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
 
                 <div>
-                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">Range: <span id="rangeVal" class="text-white">200</span>px</label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">range: <span id="rangeVal" class="text-white">200</span>px</label>
                     <input type="range" id="attractionRange" min="50" max="500" step="10" value="200" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
 
                 <div>
-                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">Push: <span id="pushVal" class="text-white">15</span>px</label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">push: <span id="pushVal" class="text-white">15</span>px</label>
                     <input type="range" id="pushRadius" min="5" max="50" step="1" value="15" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
             </div>
@@ -234,10 +184,10 @@
         
         const resetBtn = document.getElementById('resetBtn');
         const startBtn = document.getElementById('startBtn');
-        const hullToggle = document.getElementById('hullToggle');
         const neonToggle = document.getElementById('neonToggle');
         const collapseBtn = document.getElementById('collapseBtn');
         const controlPanel = document.getElementById('controlPanel');
+        const ruleGrid = document.getElementById('ruleGrid');
 
         let dots = [];
         let width, height;
@@ -246,55 +196,86 @@
         let pushDist = 15;
         let targetCount = 100; 
         let isRunning = false;
-        let showHull = false;
         let isNeon = false;
         let isCollapsed = false;
 
-        const BLUE = '#3b82f6';
-        const RED = '#ef4444';
-        const GREEN = '#22c55e';
-        const YELLOW = '#eab308';
-        const PURPLE = '#d8b4fe';
-        const ORANGE = '#fb923c';
+        const BLUE = '#00FFFF';
+        const RED = '#FF3131';
+        const GREEN = '#39FF14';
+        const YELLOW = '#FFF01F';
+        const PURPLE = '#BC13FE';
+        const ORANGE = '#FF5F1F';
 
+        const speciesKeys = ['blue', 'red', 'green', 'yellow', 'purple', 'orange'];
         const colors = { blue: BLUE, red: RED, green: GREEN, yellow: YELLOW, purple: PURPLE, orange: ORANGE };
         let activeSpecies = { blue: true, red: true, green: true, yellow: true, purple: true, orange: true };
         
-        let rules = {
-            blue: { blue: 'Stick', red: 'Flee', green: 'Flee', yellow: 'None', purple: 'Chase', orange: 'None' },
-            red: { blue: 'Chase', red: 'Stick', green: 'None', yellow: 'Flee', purple: 'None', orange: 'Chase' },
-            green: { blue: 'Chase', red: 'Flee', green: 'Stick', yellow: 'Chase', purple: 'Flee', orange: 'Stick' },
-            yellow: { blue: 'None', red: 'Chase', green: 'Flee', yellow: 'Stick', purple: 'Chase', orange: 'Flee' },
-            purple: { blue: 'Flee', red: 'Chase', green: 'Chase', yellow: 'Flee', purple: 'Stick', orange: 'None' },
-            orange: { blue: 'Chase', red: 'None', green: 'Flee', yellow: 'Chase', purple: 'Flee', orange: 'Stick' }
-        };
+        const ruleStates = ['None', 'Stick', 'Chase', 'Flee'];
+        let rules = {};
 
-        window.handleSpeciesToggle = function() {
-            activeSpecies.blue = document.getElementById('check-blue').checked;
-            activeSpecies.red = document.getElementById('check-red').checked;
-            activeSpecies.green = document.getElementById('check-green').checked;
-            activeSpecies.yellow = document.getElementById('check-yellow').checked;
-            activeSpecies.purple = document.getElementById('check-purple').checked;
-            activeSpecies.orange = document.getElementById('check-orange').checked;
-            init(); 
+        function initRules() {
+            speciesKeys.forEach(s1 => {
+                rules[s1] = {};
+                speciesKeys.forEach(s2 => {
+                    rules[s1][s2] = s1 === s2 ? 'Stick' : 'None';
+                });
+            });
+            updateRuleUI();
+        }
+
+        window.randomizeRules = function() {
+            speciesKeys.forEach(s1 => {
+                speciesKeys.forEach(s2 => {
+                    rules[s1][s2] = ruleStates[Math.floor(Math.random() * ruleStates.length)];
+                });
+            });
+            updateRuleUI();
         };
 
         window.toggleRule = function(from, to) {
-            const states = ['None', 'Stick', 'Chase', 'Flee'];
             let current = rules[from][to];
-            let nextIndex = (states.indexOf(current) + 1) % states.length;
-            rules[from][to] = states[nextIndex];
-            const cell = document.getElementById(`rule-${from}-${to}`);
-            cell.innerText = rules[from][to];
-            cell.className = "rule-cell rounded transition-all " + (
-                rules[from][to] === 'None' ? 'bg-gray-800 text-gray-500' : 
-                from === 'blue' ? 'bg-blue-900/40 text-blue-200' :
-                from === 'red' ? 'bg-red-900/40 text-red-200' :
-                from === 'green' ? 'bg-green-900/40 text-green-200' :
-                from === 'yellow' ? 'bg-yellow-900/40 text-yellow-200' :
-                from === 'purple' ? 'bg-purple-900/40 text-purple-200' :
-                'bg-orange-900/40 text-orange-200'
-            );
+            let nextIndex = (ruleStates.indexOf(current) + 1) % ruleStates.length;
+            rules[from][to] = ruleStates[nextIndex];
+            updateRuleUI();
+        };
+
+        function updateRuleUI() {
+            const headers = `
+                <div class="text-gray-500">Actor\\Target</div>
+                <div class="text-[#00FFFF] font-bold">Blu</div>
+                <div class="text-[#FF3131] font-bold">Red</div>
+                <div class="text-[#39FF14] font-bold">Grn</div>
+                <div class="text-[#FFF01F] font-bold">Yel</div>
+                <div class="text-[#BC13FE] font-bold">Pur</div>
+                <div class="text-[#FF5F1F] font-bold">Org</div>
+            `;
+            
+            let html = headers;
+            speciesKeys.forEach(s1 => {
+                const rowColor = colors[s1];
+                html += `<div style="color: ${rowColor}" class="font-bold text-left capitalize">${s1}</div>`;
+                speciesKeys.forEach(s2 => {
+                    const state = rules[s1][s2];
+                    let cellClass = "rule-cell rounded ";
+                    let cellStyle = "";
+                    
+                    if (state === 'None') {
+                        cellClass += "bg-gray-800 text-gray-500";
+                    } else {
+                        cellStyle = `background-color: ${rowColor}22; color: ${rowColor}; border: 1px solid ${rowColor}44;`;
+                    }
+                    
+                    html += `<div id="rule-${s1}-${s2}" class="${cellClass}" style="${cellStyle}" onclick="toggleRule('${s1}', '${s2}')">${state}</div>`;
+                });
+            });
+            ruleGrid.innerHTML = html;
+        }
+
+        window.handleSpeciesToggle = function() {
+            speciesKeys.forEach(k => {
+                activeSpecies[k] = document.getElementById(`check-${k}`).checked;
+            });
+            init(); 
         };
 
         class Dot {
@@ -306,25 +287,10 @@
                 this.color = colors[colorKey];
             }
             draw() {
+                ctx.fillStyle = this.color;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                
-                if (isNeon) {
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = this.color;
-                    ctx.globalCompositeOperation = 'lighter';
-                } else {
-                    ctx.shadowBlur = 0;
-                    ctx.globalCompositeOperation = 'source-over';
-                }
-                
-                ctx.fillStyle = this.color;
                 ctx.fill();
-                
-                if (isNeon) {
-                    ctx.shadowBlur = 0;
-                    ctx.globalCompositeOperation = 'source-over';
-                }
             }
             wrap() {
                 if (this.x < 0) this.x += width;
@@ -350,98 +316,13 @@
             });
         }
 
-        function getHull(points) {
-            if (points.length <= 2) return points;
-            const pts = [...points].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
-            const cross = (a, b, o) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-            const lower = [];
-            for (let p of pts) {
-                while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
-                lower.push(p);
-            }
-            const upper = [];
-            for (let i = pts.length - 1; i >= 0; i--) {
-                const p = pts[i];
-                while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
-                upper.push(p);
-            }
-            upper.pop();
-            lower.pop();
-            return lower.concat(upper);
-        }
-
-        function drawClusteredHulls() {
-            Object.keys(colors).forEach(key => {
-                if (!activeSpecies[key]) return;
-                const colorDots = dots.filter(d => d.colorKey === key);
-                if (colorDots.length === 0) return;
-
-                const clusters = [];
-                const visited = new Set();
-                const rangeThreshold = pushDist * 1.5; 
-
-                for (let i = 0; i < colorDots.length; i++) {
-                    if (visited.has(i)) continue;
-                    const cluster = [];
-                    const queue = [i];
-                    visited.add(i);
-
-                    while (queue.length > 0) {
-                        const currentIdx = queue.shift();
-                        const d1 = colorDots[currentIdx];
-                        cluster.push(d1);
-
-                        for (let j = 0; j < colorDots.length; j++) {
-                            if (visited.has(j)) continue;
-                            const d2 = colorDots[j];
-                            let dx = d2.x - d1.x;
-                            let dy = d2.y - d1.y;
-                            
-                            if (dx*dx + dy*dy < rangeThreshold * rangeThreshold) {
-                                visited.add(j);
-                                queue.push(j);
-                            }
-                        }
-                    }
-                    clusters.push(cluster);
-                }
-
-                ctx.fillStyle = colors[key];
-                ctx.strokeStyle = colors[key];
-                ctx.lineJoin = "round";
-                ctx.lineCap = "round";
-
-                for (const cluster of clusters) {
-                    if (cluster.length < 3) {
-                        for (const d of cluster) {
-                            ctx.beginPath();
-                            ctx.arc(d.x, d.y, pushDist, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
-                        continue;
-                    }
-
-                    const hull = getHull(cluster);
-                    ctx.beginPath();
-                    ctx.moveTo(hull[0].x, hull[0].y);
-                    for (let i = 1; i < hull.length; i++) {
-                        ctx.lineTo(hull[i].x, hull[i].y);
-                    }
-                    ctx.closePath();
-                    
-                    ctx.lineWidth = pushDist * 2;
-                    ctx.stroke();
-                    ctx.fill();
-                }
-            });
-        }
-
         function updatePhysics() {
             if (!isRunning) return;
-            for (let i = 0; i < dots.length; i++) {
+            const len = dots.length;
+            for (let i = 0; i < len; i++) {
                 const d1 = dots[i];
                 let moveX = 0, moveY = 0;
-                for (let j = 0; j < dots.length; j++) {
+                for (let j = 0; j < len; j++) {
                     if (i === j) continue;
                     const d2 = dots[j];
                     let dx = d2.x - d1.x, dy = d2.y - d1.y;
@@ -450,18 +331,17 @@
                     if (Math.abs(dy) > height / 2) dy = dy > 0 ? dy - height : dy + height;
                     
                     const distSq = dx * dx + dy * dy;
-                    if (distSq < 0.1) continue; 
-                    const dist = Math.sqrt(distSq);
+                    if (distSq < 0.1 || distSq > attractionRange * attractionRange) continue; 
                     
+                    const dist = Math.sqrt(distSq);
                     let force = 0;
-                    if (dist <= attractionRange) {
-                        const falloff = 1 - (dist / attractionRange);
-                        const behavior = rules[d1.colorKey][d2.colorKey];
-                        if (behavior === 'Stick' || behavior === 'Chase') {
-                            force += pullStrength * falloff;
-                        } else if (behavior === 'Flee') {
-                            force -= (pullStrength * 2) * falloff;
-                        }
+                    
+                    const falloff = 1 - (dist / attractionRange);
+                    const behavior = rules[d1.colorKey][d2.colorKey];
+                    if (behavior === 'Stick' || behavior === 'Chase') {
+                        force += pullStrength * falloff;
+                    } else if (behavior === 'Flee') {
+                        force -= (pullStrength * 2) * falloff;
                     }
                     
                     if (dist < pushDist) {
@@ -481,11 +361,29 @@
         function render() {
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, width, height);
-            
-            if (showHull) {
-                drawClusteredHulls();
+
+            if (isNeon) {
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.shadowBlur = 10;
+                dots.forEach(d => {
+                    ctx.shadowColor = d.color;
+                    d.draw();
+                });
+                ctx.shadowBlur = 0;
+                ctx.globalCompositeOperation = 'source-over';
             } else {
-                dots.forEach(d => d.draw());
+                speciesKeys.forEach(key => {
+                    if (!activeSpecies[key]) return;
+                    ctx.fillStyle = colors[key];
+                    ctx.beginPath();
+                    dots.forEach(d => {
+                        if (d.colorKey === key) {
+                            ctx.moveTo(d.x + d.radius, d.y);
+                            ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+                        }
+                    });
+                    ctx.fill();
+                });
             }
             
             requestAnimationFrame(render);
@@ -502,15 +400,9 @@
             startBtn.innerText = isRunning ? "Pause" : "Resume";
         });
 
-        hullToggle.addEventListener('click', () => {
-            showHull = !showHull;
-            hullToggle.innerText = showHull ? "Hull: On" : "Hull: Off";
-            hullToggle.classList.toggle('bg-blue-900/40', showHull);
-        });
-
         neonToggle.addEventListener('click', () => {
             isNeon = !isNeon;
-            neonToggle.innerText = isNeon ? "Neon: On" : "Neon: Off";
+            neonToggle.innerText = isNeon ? "Glow: On (will cause lag :( )" : "Glow: Off (will cause lag :( ) ";
             neonToggle.classList.toggle('bg-purple-600', isNeon);
             neonToggle.classList.toggle('text-white', isNeon);
         });
@@ -543,6 +435,8 @@
         });
 
         resetBtn.addEventListener('click', init);
+        
+        initRules();
         init();
         render();
     </script>
