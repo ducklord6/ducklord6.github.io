@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>dot swarms</title>
+    <title>High-Population Attraction Sim</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -79,13 +79,13 @@
 
     <div id="controlPanel" class="controls shadow-2xl">
         <div class="flex justify-between items-start mb-1">
-            <h1 class="text-white font-bold text-xl mb-2">changer place</h1>
+            <h1 class="text-white font-bold text-xl mb-2">Color Dynamics</h1>
         </div>
         
         <div class="hide-when-collapsed">
             <!-- Species Toggles -->
             <div class="mb-4">
-                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-3">alives</h2>
+                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-3">Active Species</h2>
                 <div class="grid grid-cols-3 gap-2">
                     <label class="species-toggle text-[#00FFFF] text-[11px]">
                         <input type="checkbox" id="check-blue" checked onchange="handleSpeciesToggle()"> Blue
@@ -110,7 +110,7 @@
 
             <div class="mb-4 bg-black/40 rounded-lg p-4 border border-white/10">
                 <div class="flex justify-between items-center mb-3">
-                    <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">behaviors (Actor → Target)</h2>
+                    <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Rule Editor (Actor → Target)</h2>
                     <button onclick="randomizeRules()" class="text-[9px] px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded uppercase font-bold tracking-tighter">Randomize</button>
                 </div>
                 <div id="ruleGrid" class="grid grid-cols-7 gap-1 text-[8px] text-center items-center">
@@ -133,22 +133,22 @@
 
             <div class="hide-when-collapsed grid grid-cols-2 gap-x-6 gap-y-4">
                 <div>
-                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">dots per color: <span id="countVal" class="text-white">100</span></label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">dots per color: <span id="countVal" class="text-white">100</span></label>
                     <input type="range" id="particleCount" min="2" max="500" step="10" value="100" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
                 
                 <div>
-                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">strength: <span id="strengthVal" class="text-white">0.050</span></label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">strength: <span id="strengthVal" class="text-white">0.050</span></label>
                     <input type="range" id="attractionStrength" min="0" max="0.2" step="0.001" value="0.05" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
 
                 <div>
-                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">range: <span id="rangeVal" class="text-white">200</span>px</label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">range: <span id="rangeVal" class="text-white">200</span>px</label>
                     <input type="range" id="attractionRange" min="50" max="500" step="10" value="200" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
 
                 <div>
-                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">counter push: <span id="pushVal" class="text-white">15</span>px</label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">push: <span id="pushVal" class="text-white">15</span>px</label>
                     <input type="range" id="pushRadius" min="5" max="50" step="1" value="15" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
             </div>
@@ -170,7 +170,6 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { alpha: false });
         
-        // Offscreen canvas for optimized glow rendering
         const glowCanvas = document.createElement('canvas');
         const glowCtx = glowCanvas.getContext('2d');
 
@@ -212,14 +211,15 @@
         const colors = { blue: BLUE, red: RED, green: GREEN, yellow: YELLOW, purple: PURPLE, orange: ORANGE };
         let activeSpecies = { blue: true, red: true, green: true, yellow: true, purple: true, orange: true };
         
-        const ruleStates = ['None', 'Stick', 'Chase', 'Flee'];
+        const ruleStates = ['None', 'Chase', 'Flee'];
         let rules = {};
 
         function initRules() {
             speciesKeys.forEach(s1 => {
                 rules[s1] = {};
                 speciesKeys.forEach(s2 => {
-                    rules[s1][s2] = s1 === s2 ? 'Stick' : 'None';
+                    // Default to 'Chase' if s1 is the same as s2, otherwise 'None'
+                    rules[s1][s2] = (s1 === s2) ? 'Chase' : 'None';
                 });
             });
             updateRuleUI();
@@ -334,7 +334,8 @@
                     
                     const falloff = 1 - (dist / attractionRange);
                     const behavior = rules[d1.colorKey][d2.colorKey];
-                    if (behavior === 'Stick' || behavior === 'Chase') {
+                    
+                    if (behavior === 'Chase') {
                         force += pullStrength * falloff;
                     } else if (behavior === 'Flee') {
                         force -= (pullStrength * 2) * falloff;
@@ -371,26 +372,19 @@
         }
 
         function render() {
-            // Base background
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, width, height);
 
             if (isNeon) {
-                // Clear glow canvas
                 glowCtx.clearRect(0, 0, width, height);
-                
-                // Draw particles to offscreen buffer
                 drawParticles(glowCtx);
 
-                // Render optimized bloom
-                // 1. Draw blurred layer (The "Glow")
                 ctx.save();
                 ctx.filter = 'blur(6px) brightness(1.5)';
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.drawImage(glowCanvas, 0, 0);
                 ctx.restore();
 
-                // 2. Draw sharp core layer
                 ctx.drawImage(glowCanvas, 0, 0);
             } else {
                 drawParticles(ctx);
@@ -399,7 +393,6 @@
             requestAnimationFrame(render);
         }
 
-        // Separate logic from render loop for consistent physics
         setInterval(updatePhysics, 16);
         
         window.addEventListener('resize', () => {
