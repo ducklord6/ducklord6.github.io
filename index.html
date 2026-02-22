@@ -1,404 +1,511 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  onSnapshot, 
-  deleteDoc, 
-  updateDoc,
-  serverTimestamp,
-  addDoc,
-  query,
-  limit
-} from 'firebase/firestore';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  signInWithCustomToken, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-
-// --- Firebase Configuration ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'neon-quest-rpg';
-
-const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [players, setPlayers] = useState({});
-  const [orbs, setOrbs] = useState({});
-  const [messages, setMessages] = useState([]);
-  const [chatInput, setChatInput] = useState('');
-  const [username, setUsername] = useState(`Explorer-${Math.floor(Math.random() * 1000)}`);
-  const [gameStarted, setGameStarted] = useState(false);
-  
-  // Player Stats
-  const [level, setLevel] = useState(1);
-  const [xp, setXp] = useState(0);
-  
-  const canvasRef = useRef(null);
-  const playerRef = useRef({
-    x: Math.random() * 600 + 100,
-    y: Math.random() * 400 + 100,
-    angle: 0,
-    color: COLORS[Math.floor(Math.random() * COLORS.length)],
-    lastUpdate: Date.now(),
-    level: 1,
-    xp: 0
-  });
-
-  const keys = useRef({});
-  const joystickRef = useRef({ active: false, x: 0, y: 0 });
-
-  // 1. Authentication
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High-Population Attraction Sim</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
         }
-      } catch (err) {
-        console.error("Auth error:", err);
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
-  }, []);
-
-  // 2. Multi-device Synchronization
-  useEffect(() => {
-    if (!user || !gameStarted) return;
-
-    const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
-    const orbsRef = collection(db, 'artifacts', appId, 'public', 'data', 'orbs');
-    const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
-    
-    // Set initial player data
-    const playerDoc = doc(playersRef, user.uid);
-    setDoc(playerDoc, {
-      id: user.uid,
-      name: username,
-      color: playerRef.current.color,
-      x: playerRef.current.x,
-      y: playerRef.current.y,
-      level: 1,
-      xp: 0,
-      lastActive: serverTimestamp()
-    });
-
-    // Spawn an orb if none exist (simple logic)
-    const spawnInitialOrbs = async () => {
-       for(let i=0; i<5; i++) {
-         await addDoc(orbsRef, {
-           x: Math.random() * 750 + 25,
-           y: Math.random() * 550 + 25,
-           value: 10
-         });
-       }
-    };
-
-    // Listen to players
-    const unsubPlayers = onSnapshot(playersRef, (snapshot) => {
-      const p = {};
-      snapshot.forEach((doc) => {
-        if (doc.id !== user.uid) p[doc.id] = doc.data();
-      });
-      setPlayers(p);
-    }, (err) => console.error(err));
-
-    // Listen to orbs
-    const unsubOrbs = onSnapshot(orbsRef, (snapshot) => {
-      const o = {};
-      snapshot.forEach((doc) => o[doc.id] = { id: doc.id, ...doc.data() });
-      setOrbs(o);
-      if (snapshot.empty) spawnInitialOrbs();
-    });
-
-    // Listen to chat
-    const unsubChat = onSnapshot(query(chatRef), (snapshot) => {
-      const msgs = [];
-      snapshot.forEach((doc) => msgs.push(doc.data()));
-      // Sort in memory by time (Rule 2: No complex queries)
-      msgs.sort((a, b) => b.timestamp?.seconds - a.timestamp?.seconds);
-      setMessages(msgs.slice(0, 10));
-    });
-
-    return () => {
-      unsubPlayers();
-      unsubOrbs();
-      unsubChat();
-      deleteDoc(playerDoc);
-    };
-  }, [user, gameStarted]);
-
-  // 3. Game Loop & Logic
-  useEffect(() => {
-    if (!gameStarted) return;
-
-    let animationFrame;
-    const update = () => {
-      const p = playerRef.current;
-      let moved = false;
-
-      const speed = 2 + (p.level * 0.2); // Speed increases with level
-
-      if (keys.current['ArrowUp'] || keys.current['w']) { p.y -= speed; moved = true; }
-      if (keys.current['ArrowDown'] || keys.current['s']) { p.y += speed; moved = true; }
-      if (keys.current['ArrowLeft'] || keys.current['a']) { p.x -= speed; moved = true; }
-      if (keys.current['ArrowRight'] || keys.current['d']) { p.x += speed; moved = true; }
-
-      if (joystickRef.current.active) {
-        const angle = Math.atan2(joystickRef.current.y, joystickRef.current.x);
-        p.x += Math.cos(angle) * speed;
-        p.y += Math.sin(angle) * speed;
-        moved = true;
-      }
-
-      // Boundaries
-      p.x = Math.max(20, Math.min(780, p.x));
-      p.y = Math.max(20, Math.min(580, p.y));
-
-      // Collision Detection (Orbs)
-      Object.values(orbs).forEach(orb => {
-        const dx = p.x - orb.x;
-        const dy = p.y - orb.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < 20) {
-          collectOrb(orb);
+        canvas {
+            display: block;
         }
-      });
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(15, 15, 15, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            color: white;
+            width: 320px;
+            z-index: 10;
+            max-height: 90vh;
+            overflow-y: auto;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .controls.collapsed {
+            width: 140px;
+            padding: 12px;
+        }
+        .rule-cell {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            font-size: 8px;
+            padding: 4px 0;
+        }
+        .rule-cell:hover {
+            filter: brightness(1.5);
+            transform: scale(1.05);
+        }
+        .controls::-webkit-scrollbar {
+            width: 4px;
+        }
+        .controls::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 2px;
+        }
+        .species-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .species-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .hide-when-collapsed {
+            transition: opacity 0.2s;
+        }
+        .collapsed .hide-when-collapsed {
+            display: none;
+        }
+    </style>
+</head>
+<body>
 
-      // Throttled Update
-      const now = Date.now();
-      if (moved && now - p.lastUpdate > 60 && user) {
-        p.lastUpdate = now;
-        const playerDoc = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-        updateDoc(playerDoc, {
-          x: p.x,
-          y: p.y,
-          level: p.level,
-          xp: p.xp,
-          lastActive: serverTimestamp()
-        }).catch(() => {});
-      }
-
-      draw();
-      animationFrame = requestAnimationFrame(update);
-    };
-
-    const collectOrb = async (orb) => {
-      const p = playerRef.current;
-      p.xp += orb.value;
-      if (p.xp >= p.level * 50) {
-        p.level += 1;
-        p.xp = 0;
-        setLevel(p.level);
-      }
-      setXp(p.xp);
-      
-      // Remove collected orb and spawn new one
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orbs', orb.id));
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orbs'), {
-        x: Math.random() * 750 + 25,
-        y: Math.random() * 550 + 25,
-        value: 10
-      });
-    };
-
-    const draw = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Background Grid
-      ctx.strokeStyle = '#0f172a';
-      for(let i=0; i<800; i+=50) {
-        ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,600); ctx.stroke();
-      }
-      for(let i=0; i<600; i+=50) {
-        ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(800,i); ctx.stroke();
-      }
-
-      // Draw Orbs
-      Object.values(orbs).forEach(orb => {
-        ctx.fillStyle = '#fbbf24';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#fbbf24';
-        ctx.beginPath();
-        ctx.arc(orb.x, orb.y, 6, 0, Math.PI*2);
-        ctx.fill();
-      });
-
-      // Draw Other Players
-      Object.values(players).forEach(p => drawAvatar(ctx, p, false));
-
-      // Draw Local Player
-      drawAvatar(ctx, { ...playerRef.current, name: username }, true);
-    };
-
-    const drawAvatar = (ctx, data, isLocal) => {
-      ctx.save();
-      ctx.translate(data.x, data.y);
-      
-      // Level Aura
-      ctx.beginPath();
-      ctx.strokeStyle = data.color;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.arc(0, 0, 15 + (data.level || 1), 0, Math.PI*2);
-      ctx.stroke();
-
-      // Body
-      ctx.fillStyle = data.color;
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = data.color;
-      ctx.beginPath();
-      ctx.arc(0, 0, 10, 0, Math.PI*2);
-      ctx.fill();
-
-      ctx.restore();
-
-      // UI Text
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = 'bold 12px Inter';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${data.name} (Lv.${data.level || 1})`, data.x, data.y - 25);
-    };
-
-    window.addEventListener('keydown', (e) => keys.current[e.key] = true);
-    window.addEventListener('keyup', (e) => keys.current[e.key] = false);
-    update();
-
-    return () => {
-      cancelAnimationFrame(animationFrame);
-    };
-  }, [gameStarted, orbs, players, user]);
-
-  const sendChatMessage = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !user) return;
-    const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
-    await addDoc(chatRef, {
-      sender: username,
-      text: chatInput,
-      timestamp: serverTimestamp()
-    });
-    setChatInput('');
-  };
-
-  if (!gameStarted) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-950 text-white font-sans">
-        <div className="p-10 bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl w-96 text-center">
-          <h1 className="text-4xl font-black mb-2 tracking-tight">NEON <span className="text-blue-500">QUEST</span></h1>
-          <p className="text-slate-500 text-sm mb-8">Multiplayer Adventure RPG</p>
-          <input 
-            className="w-full bg-slate-800 p-4 rounded-xl mb-4 border border-slate-700 outline-none focus:border-blue-500 transition-colors"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            placeholder="Choose your name"
-          />
-          <button 
-            onClick={() => setGameStarted(true)}
-            className="w-full bg-blue-600 p-4 rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/40"
-          >
-            Enter Realm
-          </button>
+    <div id="controlPanel" class="controls shadow-2xl p-5">
+        <div class="flex justify-between items-start mb-1">
+            <h1 class="text-white font-bold text-lg">Color Dynamics</h1>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden select-none">
-      {/* Sidebar: Stats & Chat */}
-      <div className="w-80 border-r border-slate-800 flex flex-col bg-slate-900/50">
-        <div className="p-6 border-b border-slate-800 bg-slate-900/80">
-          <h2 className="text-xl font-bold mb-4">Character</h2>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-xs font-bold uppercase text-slate-500 mb-1">
-                <span>Level {level}</span>
-                <span>{xp} / {level * 50} XP</span>
-              </div>
-              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 transition-all duration-300" 
-                  style={{ width: `${(xp / (level * 50)) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-grow flex flex-col p-4 overflow-hidden">
-          <h3 className="text-xs font-bold uppercase text-slate-500 mb-4">Global Chat</h3>
-          <div className="flex-grow overflow-y-auto space-y-3 mb-4 scrollbar-hide">
-            {messages.map((m, i) => (
-              <div key={i} className="text-sm">
-                <span className="font-bold text-blue-400">{m.sender}: </span>
-                <span className="text-slate-300">{m.text}</span>
-              </div>
-            ))}
-          </div>
-          <form onSubmit={sendChatMessage} className="flex gap-2">
-            <input 
-              className="flex-grow bg-slate-800 rounded-lg px-3 py-2 text-sm border border-slate-700 focus:border-blue-500 outline-none"
-              placeholder="Say hello..."
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-            />
-            <button className="bg-slate-800 p-2 rounded-lg hover:bg-slate-700">🚀</button>
-          </form>
-        </div>
-      </div>
-
-      {/* Game View */}
-      <div className="flex-grow relative bg-black flex items-center justify-center p-4">
-        <canvas 
-          ref={canvasRef}
-          width={800}
-          height={600}
-          className="max-w-full max-h-full aspect-[4/3] rounded-xl border border-slate-800 shadow-2xl"
-          onTouchStart={e => {
-            const t = e.touches[0];
-            joystickRef.current = { active: true, startX: t.clientX, startY: t.clientY, x: 0, y: 0 };
-          }}
-          onTouchMove={e => {
-            if (!joystickRef.current.active) return;
-            const t = e.touches[0];
-            joystickRef.current.x = t.clientX - joystickRef.current.startX;
-            joystickRef.current.y = t.clientY - joystickRef.current.startY;
-          }}
-          onTouchEnd={() => joystickRef.current.active = false}
-        />
         
-        <div className="absolute top-8 right-8 bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-xs">
-          <div className="font-bold mb-2">Players in Realm</div>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span>{username}</span>
+        <div class="hide-when-collapsed">
+            <p class="text-[10px] text-gray-400 mb-4">Click checkboxes to toggle species, and cells to change rules!</p>
+            
+            <!-- Species Toggles -->
+            <div class="mb-4">
+                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Active Species</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="species-toggle text-blue-400 text-[10px]">
+                        <input type="checkbox" id="check-blue" checked onchange="handleSpeciesToggle()"> Blue
+                    </label>
+                    <label class="species-toggle text-red-400 text-[10px]">
+                        <input type="checkbox" id="check-red" checked onchange="handleSpeciesToggle()"> Red
+                    </label>
+                    <label class="species-toggle text-green-400 text-[10px]">
+                        <input type="checkbox" id="check-green" checked onchange="handleSpeciesToggle()"> Green
+                    </label>
+                    <label class="species-toggle text-yellow-400 text-[10px]">
+                        <input type="checkbox" id="check-yellow" checked onchange="handleSpeciesToggle()"> Yellow
+                    </label>
+                </div>
             </div>
-            {Object.values(players).map(p => (
-              <div key={p.id} className="flex items-center gap-2 text-slate-400">
-                <div className="w-2 h-2 rounded-full bg-slate-600"></div>
-                <span>{p.name} (Lv.{p.level})</span>
-              </div>
-            ))}
-          </div>
+
+            <div class="mb-6 bg-black/40 rounded-lg p-3 border border-white/10">
+                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Rule Editor (From \ To)</h2>
+                <div id="ruleGrid" class="grid grid-cols-5 gap-1 text-[9px] text-center items-center">
+                    <div class="text-gray-500">Actor\Target</div>
+                    <div class="text-blue-400 font-bold">Blu</div>
+                    <div class="text-red-400 font-bold">Red</div>
+                    <div class="text-green-400 font-bold">Grn</div>
+                    <div class="text-yellow-400 font-bold">Yel</div>
+                    
+                    <div class="text-blue-400 font-bold text-left">Blue</div>
+                    <div id="rule-blue-blue" class="rule-cell bg-blue-900/40 rounded" onclick="toggleRule('blue', 'blue')">Stick</div>
+                    <div id="rule-blue-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('blue', 'red')">Flee</div>
+                    <div id="rule-blue-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('blue', 'green')">Flee</div>
+                    <div id="rule-blue-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('blue', 'yellow')">None</div>
+
+                    <div class="text-red-400 font-bold text-left">Red</div>
+                    <div id="rule-red-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('red', 'blue')">Chase</div>
+                    <div id="rule-red-red" class="rule-cell bg-red-900/40 rounded" onclick="toggleRule('red', 'red')">Stick</div>
+                    <div id="rule-red-green" class="rule-cell bg-gray-800 rounded text-gray-500" onclick="toggleRule('red', 'green')">None</div>
+                    <div id="rule-red-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('red', 'yellow')">Flee</div>
+
+                    <div class="text-green-400 font-bold text-left">Green</div>
+                    <div id="rule-green-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('green', 'blue')">Chase</div>
+                    <div id="rule-green-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('green', 'red')">Flee</div>
+                    <div id="rule-green-green" class="rule-cell bg-green-900/40 rounded" onclick="toggleRule('green', 'green')">Stick</div>
+                    <div id="rule-green-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('green', 'yellow')">Chase</div>
+
+                    <div class="text-yellow-400 font-bold text-left">Yellow</div>
+                    <div id="rule-yellow-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('yellow', 'blue')">None</div>
+                    <div id="rule-yellow-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('yellow', 'red')">Chase</div>
+                    <div id="rule-yellow-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('yellow', 'green')">Flee</div>
+                    <div id="rule-yellow-yellow" class="rule-cell bg-yellow-900/40 rounded" onclick="toggleRule('yellow', 'yellow')">Stick</div>
+                </div>
+            </div>
         </div>
-      </div>
+
+        <div class="space-y-4">
+            <div class="flex flex-col gap-2">
+                <button id="startBtn" class="w-full py-2 bg-blue-600 hover:bg-blue-500 transition-colors rounded text-sm font-bold uppercase tracking-wider">
+                    Start
+                </button>
+                <div class="flex gap-2 hide-when-collapsed">
+                    <button id="neonToggle" class="flex-1 py-2 border border-purple-500 text-purple-400 hover:bg-purple-900/20 transition-colors rounded text-xs font-bold uppercase">
+                        Neon: Off
+                    </button>
+                    <button id="hullToggle" class="flex-1 py-2 border border-gray-600 hover:bg-gray-800 transition-colors rounded text-xs font-bold uppercase">
+                        Hull: Off
+                    </button>
+                </div>
+            </div>
+
+            <div class="hide-when-collapsed space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Dots per Color: <span id="countVal">100</span></label>
+                    <input type="range" id="particleCount" min="2" max="500" step="10" value="100" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Interaction Strength: <span id="strengthVal">0.050</span></label>
+                    <input type="range" id="attractionStrength" min="0" max="0.2" step="0.001" value="0.05" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Interaction Range: <span id="rangeVal">200</span>px</label>
+                    <input type="range" id="attractionRange" min="50" max="500" step="10" value="200" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Counter Push: <span id="pushVal">15</span>px</label>
+                    <input type="range" id="pushRadius" min="5" max="50" step="1" value="15" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <button id="resetBtn" class="w-full py-2 border border-gray-600 hover:bg-gray-800 transition-colors rounded text-xs">
+                    Reset
+                </button>
+                <button id="collapseBtn" class="w-full py-1 text-[9px] text-gray-500 hover:text-white transition-colors uppercase font-bold tracking-widest">
+                    Collapse Controls
+                </button>
+            </div>
+        </div>
     </div>
-  );
-}
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const particleCountInput = document.getElementById('particleCount');
+        const strengthInput = document.getElementById('attractionStrength');
+        const rangeInput = document.getElementById('attractionRange');
+        const pushRadiusInput = document.getElementById('pushRadius');
+        
+        const countValLabel = document.getElementById('countVal');
+        const strengthValLabel = document.getElementById('strengthVal');
+        const rangeValLabel = document.getElementById('rangeVal');
+        const pushValLabel = document.getElementById('pushVal');
+        
+        const resetBtn = document.getElementById('resetBtn');
+        const startBtn = document.getElementById('startBtn');
+        const hullToggle = document.getElementById('hullToggle');
+        const neonToggle = document.getElementById('neonToggle');
+        const collapseBtn = document.getElementById('collapseBtn');
+        const controlPanel = document.getElementById('controlPanel');
+
+        let dots = [];
+        let width, height;
+        let pullStrength = 0.05; 
+        let attractionRange = 200;
+        let pushDist = 15;
+        let targetCount = 100; 
+        let isRunning = false;
+        let showHull = false;
+        let isNeon = false;
+        let isCollapsed = false;
+
+        const BLUE = '#3b82f6';
+        const RED = '#ef4444';
+        const GREEN = '#22c55e';
+        const YELLOW = '#eab308';
+
+        const colors = { blue: BLUE, red: RED, green: GREEN, yellow: YELLOW };
+        let activeSpecies = { blue: true, red: true, green: true, yellow: true };
+        
+        let rules = {
+            blue: { blue: 'Stick', red: 'Flee', green: 'Flee', yellow: 'None' },
+            red: { blue: 'Chase', red: 'Stick', green: 'None', yellow: 'Flee' },
+            green: { blue: 'Chase', red: 'Flee', green: 'Stick', yellow: 'Chase' },
+            yellow: { blue: 'None', red: 'Chase', green: 'Flee', yellow: 'Stick' }
+        };
+
+        window.handleSpeciesToggle = function() {
+            activeSpecies.blue = document.getElementById('check-blue').checked;
+            activeSpecies.red = document.getElementById('check-red').checked;
+            activeSpecies.green = document.getElementById('check-green').checked;
+            activeSpecies.yellow = document.getElementById('check-yellow').checked;
+            init(); 
+        };
+
+        window.toggleRule = function(from, to) {
+            const states = ['None', 'Stick', 'Chase', 'Flee'];
+            let current = rules[from][to];
+            let nextIndex = (states.indexOf(current) + 1) % states.length;
+            rules[from][to] = states[nextIndex];
+            const cell = document.getElementById(`rule-${from}-${to}`);
+            cell.innerText = rules[from][to];
+            cell.className = "rule-cell rounded transition-all " + (
+                rules[from][to] === 'None' ? 'bg-gray-800 text-gray-500' : 
+                from === 'blue' ? 'bg-blue-900/40 text-blue-200' :
+                from === 'red' ? 'bg-red-900/40 text-red-200' :
+                from === 'green' ? 'bg-green-900/40 text-green-200' :
+                'bg-yellow-900/40 text-yellow-200'
+            );
+        };
+
+        class Dot {
+            constructor(x, y, colorKey) {
+                this.x = x;
+                this.y = y;
+                this.radius = 2.5; 
+                this.colorKey = colorKey;
+                this.color = colors[colorKey];
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                
+                if (isNeon) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = this.color;
+                    ctx.globalCompositeOperation = 'lighter';
+                } else {
+                    ctx.shadowBlur = 0;
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                if (isNeon) {
+                    ctx.shadowBlur = 0;
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+            }
+            wrap() {
+                if (this.x < 0) this.x += width;
+                if (this.x > width) this.x -= width;
+                if (this.y < 0) this.y += height;
+                if (this.y > height) this.y -= height;
+            }
+        }
+
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            dots = [];
+            isRunning = false;
+            startBtn.innerText = "Start";
+            
+            Object.keys(activeSpecies).forEach(key => {
+                if (activeSpecies[key]) {
+                    for (let i = 0; i < targetCount; i++) {
+                        dots.push(new Dot(Math.random() * width, Math.random() * height, key));
+                    }
+                }
+            });
+        }
+
+        function getHull(points) {
+            if (points.length <= 2) return points;
+            const pts = [...points].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
+            const cross = (a, b, o) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+            const lower = [];
+            for (let p of pts) {
+                while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+                lower.push(p);
+            }
+            const upper = [];
+            for (let i = pts.length - 1; i >= 0; i--) {
+                const p = pts[i];
+                while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+                upper.push(p);
+            }
+            upper.pop();
+            lower.pop();
+            return lower.concat(upper);
+        }
+
+        function drawClusteredHulls() {
+            Object.keys(colors).forEach(key => {
+                if (!activeSpecies[key]) return;
+                const colorDots = dots.filter(d => d.colorKey === key);
+                if (colorDots.length === 0) return;
+
+                const clusters = [];
+                const visited = new Set();
+                const rangeThreshold = pushDist * 1.5; 
+
+                for (let i = 0; i < colorDots.length; i++) {
+                    if (visited.has(i)) continue;
+                    const cluster = [];
+                    const queue = [i];
+                    visited.add(i);
+
+                    while (queue.length > 0) {
+                        const currentIdx = queue.shift();
+                        const d1 = colorDots[currentIdx];
+                        cluster.push(d1);
+
+                        for (let j = 0; j < colorDots.length; j++) {
+                            if (visited.has(j)) continue;
+                            const d2 = colorDots[j];
+                            let dx = d2.x - d1.x;
+                            let dy = d2.y - d1.y;
+                            
+                            if (dx*dx + dy*dy < rangeThreshold * rangeThreshold) {
+                                visited.add(j);
+                                queue.push(j);
+                            }
+                        }
+                    }
+                    clusters.push(cluster);
+                }
+
+                ctx.fillStyle = colors[key];
+                ctx.strokeStyle = colors[key];
+                ctx.lineJoin = "round";
+                ctx.lineCap = "round";
+
+                for (const cluster of clusters) {
+                    if (cluster.length < 3) {
+                        for (const d of cluster) {
+                            ctx.beginPath();
+                            ctx.arc(d.x, d.y, pushDist, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        continue;
+                    }
+
+                    const hull = getHull(cluster);
+                    ctx.beginPath();
+                    ctx.moveTo(hull[0].x, hull[0].y);
+                    for (let i = 1; i < hull.length; i++) {
+                        ctx.lineTo(hull[i].x, hull[i].y);
+                    }
+                    ctx.closePath();
+                    
+                    ctx.lineWidth = pushDist * 2;
+                    ctx.stroke();
+                    ctx.fill();
+                }
+            });
+        }
+
+        function updatePhysics() {
+            if (!isRunning) return;
+            for (let i = 0; i < dots.length; i++) {
+                const d1 = dots[i];
+                let moveX = 0, moveY = 0;
+                for (let j = 0; j < dots.length; j++) {
+                    if (i === j) continue;
+                    const d2 = dots[j];
+                    let dx = d2.x - d1.x, dy = d2.y - d1.y;
+                    
+                    if (Math.abs(dx) > width / 2) dx = dx > 0 ? dx - width : dx + width;
+                    if (Math.abs(dy) > height / 2) dy = dy > 0 ? dy - height : dy + height;
+                    
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < 0.1) continue; 
+                    const dist = Math.sqrt(distSq);
+                    
+                    let force = 0;
+                    if (dist <= attractionRange) {
+                        const falloff = 1 - (dist / attractionRange);
+                        const behavior = rules[d1.colorKey][d2.colorKey];
+                        if (behavior === 'Stick' || behavior === 'Chase') {
+                            force += pullStrength * falloff;
+                        } else if (behavior === 'Flee') {
+                            force -= (pullStrength * 2) * falloff;
+                        }
+                    }
+                    
+                    if (dist < pushDist) {
+                        force -= (1 - dist / pushDist) * 0.5;
+                    }
+                    
+                    if (force !== 0) {
+                        moveX += (dx / dist) * force;
+                        moveY += (dy / dist) * force;
+                    }
+                }
+                d1.x += moveX; d1.y += moveY;
+                d1.wrap();
+            }
+        }
+
+        function render() {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, width, height);
+            
+            if (showHull) {
+                drawClusteredHulls();
+            } else {
+                dots.forEach(d => d.draw());
+            }
+            
+            requestAnimationFrame(render);
+        }
+
+        setInterval(updatePhysics, 16);
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        startBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            startBtn.innerText = isRunning ? "Pause" : "Resume";
+        });
+
+        hullToggle.addEventListener('click', () => {
+            showHull = !showHull;
+            hullToggle.innerText = showHull ? "Hull: On" : "Hull: Off";
+            hullToggle.classList.toggle('bg-blue-900/40', showHull);
+        });
+
+        neonToggle.addEventListener('click', () => {
+            isNeon = !isNeon;
+            neonToggle.innerText = isNeon ? "Neon: On" : "Neon: Off";
+            neonToggle.classList.toggle('bg-purple-600', isNeon);
+            neonToggle.classList.toggle('text-white', isNeon);
+        });
+
+        collapseBtn.addEventListener('click', () => {
+            isCollapsed = !isCollapsed;
+            controlPanel.classList.toggle('collapsed', isCollapsed);
+            collapseBtn.innerText = isCollapsed ? "Show Controls" : "Collapse Controls";
+        });
+
+        particleCountInput.addEventListener('input', (e) => {
+            targetCount = parseInt(e.target.value);
+            countValLabel.innerText = targetCount;
+            init(); 
+        });
+
+        strengthInput.addEventListener('input', (e) => {
+            pullStrength = parseFloat(e.target.value);
+            strengthValLabel.innerText = pullStrength.toFixed(3);
+        });
+
+        rangeInput.addEventListener('input', (e) => {
+            attractionRange = parseInt(e.target.value);
+            rangeValLabel.innerText = attractionRange;
+        });
+
+        pushRadiusInput.addEventListener('input', (e) => {
+            pushDist = parseInt(e.target.value);
+            pushValLabel.innerText = pushDist;
+        });
+
+        resetBtn.addEventListener('click', init);
+        init();
+        render();
+    </script>
+</body>
+</html>
