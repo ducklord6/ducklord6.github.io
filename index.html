@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>funy dot gam</title>
+    <title>High-Population Attraction Sim</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -20,13 +20,13 @@
             top: 20px;
             left: 20px;
             background: rgba(15, 15, 15, 0.95);
-            padding: 20px;
+            padding: 24px;
             border-radius: 12px;
             border: 1px solid #333;
             color: white;
-            width: 320px;
+            width: 520px; 
             z-index: 10;
-            max-height: 90vh;
+            max-height: 98vh;
             overflow-y: auto;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -38,8 +38,8 @@
             cursor: pointer;
             transition: all 0.2s ease;
             user-select: none;
-            font-size: 8px;
-            padding: 4px 0;
+            font-size: 9px;
+            padding: 6px 0;
         }
         .rule-cell:hover {
             filter: brightness(1.5);
@@ -56,7 +56,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 4px 8px;
+            padding: 6px 10px;
             border-radius: 4px;
             background: rgba(255, 255, 255, 0.05);
             cursor: pointer;
@@ -75,72 +75,102 @@
 </head>
 <body>
 
-    <div id="controlPanel" class="controls shadow-2xl p-5">
+    <div id="controlPanel" class="controls shadow-2xl">
         <div class="flex justify-between items-start mb-1">
-            <h1 class="text-white font-bold text-lg">change stuff</h1>
+            <h1 class="text-white font-bold text-xl mb-2">Color Dynamics</h1>
         </div>
         
         <div class="hide-when-collapsed">
-            <p class="text-[10px] text-gray-400 mb-4">do random shit</p>
-            
             <!-- Species Toggles -->
             <div class="mb-4">
-                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Active Species</h2>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="species-toggle text-blue-400 text-[10px]">
+                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-3">Active Species</h2>
+                <div class="grid grid-cols-3 gap-2">
+                    <label class="species-toggle text-blue-400 text-[11px]">
                         <input type="checkbox" id="check-blue" checked onchange="handleSpeciesToggle()"> Blue
                     </label>
-                    <label class="species-toggle text-red-400 text-[10px]">
+                    <label class="species-toggle text-red-400 text-[11px]">
                         <input type="checkbox" id="check-red" checked onchange="handleSpeciesToggle()"> Red
                     </label>
-                    <label class="species-toggle text-green-400 text-[10px]">
+                    <label class="species-toggle text-green-400 text-[11px]">
                         <input type="checkbox" id="check-green" checked onchange="handleSpeciesToggle()"> Green
                     </label>
-                    <label class="species-toggle text-yellow-400 text-[10px]">
+                    <label class="species-toggle text-yellow-400 text-[11px]">
                         <input type="checkbox" id="check-yellow" checked onchange="handleSpeciesToggle()"> Yellow
+                    </label>
+                    <label class="species-toggle text-purple-300 text-[11px]">
+                        <input type="checkbox" id="check-purple" checked onchange="handleSpeciesToggle()"> Purple
+                    </label>
+                    <label class="species-toggle text-orange-400 text-[11px]">
+                        <input type="checkbox" id="check-orange" checked onchange="handleSpeciesToggle()"> Orange
                     </label>
                 </div>
             </div>
 
-            <div class="mb-6 bg-black/40 rounded-lg p-3 border border-white/10">
-                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Rule Editor (From \ To)</h2>
-                <div id="ruleGrid" class="grid grid-cols-5 gap-1 text-[9px] text-center items-center">
+            <div class="mb-4 bg-black/40 rounded-lg p-4 border border-white/10">
+                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-3">Rule Editor (Actor → Target)</h2>
+                <div id="ruleGrid" class="grid grid-cols-7 gap-1 text-[8px] text-center items-center">
                     <div class="text-gray-500">Actor\Target</div>
                     <div class="text-blue-400 font-bold">Blu</div>
                     <div class="text-red-400 font-bold">Red</div>
                     <div class="text-green-400 font-bold">Grn</div>
                     <div class="text-yellow-400 font-bold">Yel</div>
+                    <div class="text-purple-300 font-bold">Pur</div>
+                    <div class="text-orange-400 font-bold">Org</div>
                     
                     <div class="text-blue-400 font-bold text-left">Blue</div>
                     <div id="rule-blue-blue" class="rule-cell bg-blue-900/40 rounded" onclick="toggleRule('blue', 'blue')">Stick</div>
                     <div id="rule-blue-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('blue', 'red')">Flee</div>
                     <div id="rule-blue-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('blue', 'green')">Flee</div>
                     <div id="rule-blue-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('blue', 'yellow')">None</div>
+                    <div id="rule-blue-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('blue', 'purple')">Chase</div>
+                    <div id="rule-blue-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('blue', 'orange')">None</div>
 
                     <div class="text-red-400 font-bold text-left">Red</div>
                     <div id="rule-red-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('red', 'blue')">Chase</div>
                     <div id="rule-red-red" class="rule-cell bg-red-900/40 rounded" onclick="toggleRule('red', 'red')">Stick</div>
-                    <div id="rule-red-green" class="rule-cell bg-gray-800 rounded text-gray-500" onclick="toggleRule('red', 'green')">None</div>
+                    <div id="rule-red-green" class="rule-cell bg-gray-800 text-gray-500 rounded" onclick="toggleRule('red', 'green')">None</div>
                     <div id="rule-red-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('red', 'yellow')">Flee</div>
+                    <div id="rule-red-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('red', 'purple')">None</div>
+                    <div id="rule-red-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('red', 'orange')">Chase</div>
 
                     <div class="text-green-400 font-bold text-left">Green</div>
                     <div id="rule-green-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('green', 'blue')">Chase</div>
                     <div id="rule-green-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('green', 'red')">Flee</div>
                     <div id="rule-green-green" class="rule-cell bg-green-900/40 rounded" onclick="toggleRule('green', 'green')">Stick</div>
                     <div id="rule-green-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('green', 'yellow')">Chase</div>
+                    <div id="rule-green-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('green', 'purple')">Flee</div>
+                    <div id="rule-green-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('green', 'orange')">Stick</div>
 
                     <div class="text-yellow-400 font-bold text-left">Yellow</div>
                     <div id="rule-yellow-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('yellow', 'blue')">None</div>
                     <div id="rule-yellow-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('yellow', 'red')">Chase</div>
                     <div id="rule-yellow-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('yellow', 'green')">Flee</div>
                     <div id="rule-yellow-yellow" class="rule-cell bg-yellow-900/40 rounded" onclick="toggleRule('yellow', 'yellow')">Stick</div>
+                    <div id="rule-yellow-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('yellow', 'purple')">Chase</div>
+                    <div id="rule-yellow-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('yellow', 'orange')">Flee</div>
+
+                    <div class="text-purple-300 font-bold text-left">Purple</div>
+                    <div id="rule-purple-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('purple', 'blue')">Flee</div>
+                    <div id="rule-purple-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('purple', 'red')">Chase</div>
+                    <div id="rule-purple-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('purple', 'green')">Chase</div>
+                    <div id="rule-purple-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('purple', 'yellow')">Flee</div>
+                    <div id="rule-purple-purple" class="rule-cell bg-purple-900/40 rounded" onclick="toggleRule('purple', 'purple')">Stick</div>
+                    <div id="rule-purple-orange" class="rule-cell bg-orange-900/40 rounded text-orange-200" onclick="toggleRule('purple', 'orange')">None</div>
+
+                    <div class="text-orange-400 font-bold text-left">Orange</div>
+                    <div id="rule-orange-blue" class="rule-cell bg-blue-900/40 rounded text-blue-200" onclick="toggleRule('orange', 'blue')">Chase</div>
+                    <div id="rule-orange-red" class="rule-cell bg-red-900/40 rounded text-red-200" onclick="toggleRule('orange', 'red')">None</div>
+                    <div id="rule-orange-green" class="rule-cell bg-green-900/40 rounded text-green-200" onclick="toggleRule('orange', 'green')">Flee</div>
+                    <div id="rule-orange-yellow" class="rule-cell bg-yellow-900/40 rounded text-yellow-200" onclick="toggleRule('orange', 'yellow')">Chase</div>
+                    <div id="rule-orange-purple" class="rule-cell bg-purple-900/40 rounded text-purple-200" onclick="toggleRule('orange', 'purple')">Flee</div>
+                    <div id="rule-orange-orange" class="rule-cell bg-orange-900/40 rounded" onclick="toggleRule('orange', 'orange')">Stick</div>
                 </div>
             </div>
         </div>
 
         <div class="space-y-4">
             <div class="flex flex-col gap-2">
-                <button id="startBtn" class="w-full py-2 bg-blue-600 hover:bg-blue-500 transition-colors rounded text-sm font-bold uppercase tracking-wider">
+                <button id="startBtn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 transition-colors rounded text-sm font-bold uppercase tracking-wider">
                     Start
                 </button>
                 <div class="flex gap-2 hide-when-collapsed">
@@ -153,24 +183,25 @@
                 </div>
             </div>
 
-            <div class="hide-when-collapsed space-y-4">
+            <!-- Side-by-side sliders -->
+            <div class="hide-when-collapsed grid grid-cols-2 gap-x-6 gap-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-gray-400 mb-1">Dots per Color: <span id="countVal">100</span></label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">Dots/Color: <span id="countVal" class="text-white">100</span></label>
                     <input type="range" id="particleCount" min="2" max="500" step="10" value="100" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
                 
                 <div>
-                    <label class="block text-xs font-medium text-gray-400 mb-1">strength: <span id="strengthVal">0.050</span></label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">Strength: <span id="strengthVal" class="text-white">0.050</span></label>
                     <input type="range" id="attractionStrength" min="0" max="0.2" step="0.001" value="0.05" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-gray-400 mb-1">range <span id="rangeVal">200</span>px</label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">Range: <span id="rangeVal" class="text-white">200</span>px</label>
                     <input type="range" id="attractionRange" min="50" max="500" step="10" value="200" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-gray-400 mb-1">Counter Push: <span id="pushVal">15</span>px</label>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 uppercase tracking-tighter">Push: <span id="pushVal" class="text-white">15</span>px</label>
                     <input type="range" id="pushRadius" min="5" max="50" step="1" value="15" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 </div>
             </div>
@@ -223,15 +254,19 @@
         const RED = '#ef4444';
         const GREEN = '#22c55e';
         const YELLOW = '#eab308';
+        const PURPLE = '#d8b4fe';
+        const ORANGE = '#fb923c';
 
-        const colors = { blue: BLUE, red: RED, green: GREEN, yellow: YELLOW };
-        let activeSpecies = { blue: true, red: true, green: true, yellow: true };
+        const colors = { blue: BLUE, red: RED, green: GREEN, yellow: YELLOW, purple: PURPLE, orange: ORANGE };
+        let activeSpecies = { blue: true, red: true, green: true, yellow: true, purple: true, orange: true };
         
         let rules = {
-            blue: { blue: 'Stick', red: 'Flee', green: 'Flee', yellow: 'None' },
-            red: { blue: 'Chase', red: 'Stick', green: 'None', yellow: 'Flee' },
-            green: { blue: 'Chase', red: 'Flee', green: 'Stick', yellow: 'Chase' },
-            yellow: { blue: 'None', red: 'Chase', green: 'Flee', yellow: 'Stick' }
+            blue: { blue: 'Stick', red: 'Flee', green: 'Flee', yellow: 'None', purple: 'Chase', orange: 'None' },
+            red: { blue: 'Chase', red: 'Stick', green: 'None', yellow: 'Flee', purple: 'None', orange: 'Chase' },
+            green: { blue: 'Chase', red: 'Flee', green: 'Stick', yellow: 'Chase', purple: 'Flee', orange: 'Stick' },
+            yellow: { blue: 'None', red: 'Chase', green: 'Flee', yellow: 'Stick', purple: 'Chase', orange: 'Flee' },
+            purple: { blue: 'Flee', red: 'Chase', green: 'Chase', yellow: 'Flee', purple: 'Stick', orange: 'None' },
+            orange: { blue: 'Chase', red: 'None', green: 'Flee', yellow: 'Chase', purple: 'Flee', orange: 'Stick' }
         };
 
         window.handleSpeciesToggle = function() {
@@ -239,6 +274,8 @@
             activeSpecies.red = document.getElementById('check-red').checked;
             activeSpecies.green = document.getElementById('check-green').checked;
             activeSpecies.yellow = document.getElementById('check-yellow').checked;
+            activeSpecies.purple = document.getElementById('check-purple').checked;
+            activeSpecies.orange = document.getElementById('check-orange').checked;
             init(); 
         };
 
@@ -254,7 +291,9 @@
                 from === 'blue' ? 'bg-blue-900/40 text-blue-200' :
                 from === 'red' ? 'bg-red-900/40 text-red-200' :
                 from === 'green' ? 'bg-green-900/40 text-green-200' :
-                'bg-yellow-900/40 text-yellow-200'
+                from === 'yellow' ? 'bg-yellow-900/40 text-yellow-200' :
+                from === 'purple' ? 'bg-purple-900/40 text-purple-200' :
+                'bg-orange-900/40 text-orange-200'
             );
         };
 
