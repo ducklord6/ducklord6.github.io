@@ -3,64 +3,447 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ducklord6</title>
+    <title>dot swarm</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            background-color: #f3f4f6;
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(15, 15, 15, 0.95);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            color: white;
+            width: 520px; 
+            z-index: 10;
+            max-height: 98vh;
+            overflow-y: auto;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .controls.collapsed {
+            width: 140px;
+            padding: 12px;
+        }
+        .rule-cell {
+            cursor: pointer;
+            transition: all 0.1s ease;
+            user-select: none;
+            font-size: 9px;
+            padding: 6px 0;
+        }
+        .rule-cell:hover {
+            filter: brightness(1.5);
+        }
+        .controls::-webkit-scrollbar {
+            width: 4px;
+        }
+        .controls::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 2px;
+        }
+        .species-toggle {
             display: flex;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            font-family: sans-serif;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .species-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .hide-when-collapsed {
+            transition: opacity 0.2s;
+        }
+        .collapsed .hide-when-collapsed {
+            display: none;
         }
     </style>
 </head>
 <body>
 
-    <div class="text-center p-8 bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm">
-        <div class="flex flex-col gap-4">
-            <!-- The Textbox (marked as readonly) -->
-            <input 
-                type="text" 
-                id="myTextbox" 
-                readonly
-                class="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-lg text-gray-600 cursor-default outline-none transition-all"
-            >
+    <div id="controlPanel" class="controls shadow-2xl">
+        <div class="flex justify-between items-start mb-1">
+            <h1 class="text-white font-bold text-xl mb-2">contol place</h1>
+        </div>
+        
+        <div class="hide-when-collapsed">
+            <!-- Species Toggles -->
+            <div class="mb-4">
+                <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-3">alives</h2>
+                <div class="grid grid-cols-3 gap-2">
+                    <label class="species-toggle text-[#00FFFF] text-[11px]">
+                        <input type="checkbox" id="check-blue" checked onchange="handleSpeciesToggle()"> Blue
+                    </label>
+                    <label class="species-toggle text-[#FF3131] text-[11px]">
+                        <input type="checkbox" id="check-red" checked onchange="handleSpeciesToggle()"> Red
+                    </label>
+                    <label class="species-toggle text-[#39FF14] text-[11px]">
+                        <input type="checkbox" id="check-green" checked onchange="handleSpeciesToggle()"> Green
+                    </label>
+                    <label class="species-toggle text-[#FFF01F] text-[11px]">
+                        <input type="checkbox" id="check-yellow" checked onchange="handleSpeciesToggle()"> Yellow
+                    </label>
+                    <label class="species-toggle text-[#BC13FE] text-[11px]">
+                        <input type="checkbox" id="check-purple" checked onchange="handleSpeciesToggle()"> Purple
+                    </label>
+                    <label class="species-toggle text-[#FF5F1F] text-[11px]">
+                        <input type="checkbox" id="check-orange" checked onchange="handleSpeciesToggle()"> Orange
+                    </label>
+                </div>
+            </div>
 
-            <!-- The Button -->
-            <button 
-                onclick="handleNavigation()"
-                id="mainButton"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-all transform active:scale-95 shadow-md"
-            >
-                Click Me
-            </button>
+            <div class="mb-4 bg-black/40 rounded-lg p-4 border border-white/10">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Rule Editor (Actor → Target)</h2>
+                    <button onclick="randomizeRules()" class="text-[9px] px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded uppercase font-bold tracking-tighter">Randomize</button>
+                </div>
+                <div id="ruleGrid" class="grid grid-cols-7 gap-1 text-[8px] text-center items-center">
+                    <!-- Grid headers injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <div class="flex flex-col gap-2">
+                <button id="startBtn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 transition-colors rounded text-sm font-bold uppercase tracking-wider">
+                    Start
+                </button>
+                <div class="flex gap-2 hide-when-collapsed">
+                    <button id="neonToggle" class="flex-1 py-2 border border-purple-500 text-purple-400 hover:bg-purple-900/20 transition-colors rounded text-xs font-bold uppercase">
+                        Glow: Off
+                    </button>
+                </div>
+            </div>
+
+            <div class="hide-when-collapsed grid grid-cols-2 gap-x-6 gap-y-4">
+                <div>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">dots per color: <span id="countVal" class="text-white">100</span></label>
+                    <input type="range" id="particleCount" min="10" max="500" step="10" value="100" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">strength: <span id="strengthVal" class="text-white">0.050</span></label>
+                    <input type="range" id="attractionStrength" min="0" max="0.2" step="0.001" value="0.05" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">range: <span id="rangeVal" class="text-white">200</span>px</label>
+                    <input type="range" id="attractionRange" min="50" max="500" step="10" value="200" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-medium text-gray-400 mb-1.5 lowercase tracking-tighter">push: <span id="pushVal" class="text-white">15</span>px</label>
+                    <input type="range" id="pushRadius" min="5" max="50" step="1" value="15" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <button id="resetBtn" class="w-full py-2 border border-gray-600 hover:bg-gray-800 transition-colors rounded text-xs">
+                    Reset
+                </button>
+                <button id="collapseBtn" class="w-full py-1 text-[9px] text-gray-500 hover:text-white transition-colors uppercase font-bold tracking-widest">
+                    Collapse Controls
+                </button>
+            </div>
         </div>
     </div>
 
+    <canvas id="canvas"></canvas>
+
     <script>
-        /* MANUAL EDITING SECTION
-           Change the values inside the quotes below to update your page!
-        */
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
         
-        const BUTTON_TEXT = "CLICK TO PLAY MY GAME PLEASE"; 
-        const DESTINATION_URL = "ducklord6.github.io/dots.html";
-        const TEXTBOX_CONTENT = "PLEASE PLEASE PLEASE PLAY MY GAME"; // Edit this in code to change what the box says
+        const glowCanvas = document.createElement('canvas');
+        const glowCtx = glowCanvas.getContext('2d');
 
-        /* --------------------------------------------------------- */
+        const particleCountInput = document.getElementById('particleCount');
+        const strengthInput = document.getElementById('attractionStrength');
+        const rangeInput = document.getElementById('attractionRange');
+        const pushRadiusInput = document.getElementById('pushRadius');
+        
+        const countValLabel = document.getElementById('countVal');
+        const strengthValLabel = document.getElementById('strengthVal');
+        const rangeValLabel = document.getElementById('rangeVal');
+        const pushValLabel = document.getElementById('pushVal');
+        
+        const resetBtn = document.getElementById('resetBtn');
+        const startBtn = document.getElementById('startBtn');
+        const neonToggle = document.getElementById('neonToggle');
+        const collapseBtn = document.getElementById('collapseBtn');
+        const controlPanel = document.getElementById('controlPanel');
+        const ruleGrid = document.getElementById('ruleGrid');
 
-        // This runs automatically when the page loads
-        window.onload = function() {
-            document.getElementById('mainButton').textContent = BUTTON_TEXT;
-            document.getElementById('myTextbox').value = TEXTBOX_CONTENT;
+        let dots = [];
+        let width, height;
+        let pullStrength = 0.05; 
+        let attractionRange = 200;
+        let pushDist = 15;
+        let targetCount = 100; 
+        let isRunning = false;
+        let isNeon = false;
+        let isCollapsed = false;
+
+        const BLUE = '#00FFFF';
+        const RED = '#FF3131';
+        const GREEN = '#39FF14';
+        const YELLOW = '#FFF01F';
+        const PURPLE = '#BC13FE';
+        const ORANGE = '#FF5F1F';
+
+        const speciesKeys = ['blue', 'red', 'green', 'yellow', 'purple', 'orange'];
+        const colors = { blue: BLUE, red: RED, green: GREEN, yellow: YELLOW, purple: PURPLE, orange: ORANGE };
+        let activeSpecies = { blue: true, red: true, green: true, yellow: true, purple: true, orange: true };
+        
+        const ruleStates = ['None', 'Chase', 'Flee'];
+        let rules = {};
+
+        function initRules() {
+            speciesKeys.forEach(s1 => {
+                rules[s1] = {};
+                speciesKeys.forEach(s2 => {
+                    // Default to 'Chase' if s1 is the same as s2, otherwise 'None'
+                    rules[s1][s2] = (s1 === s2) ? 'Chase' : 'None';
+                });
+            });
+            updateRuleUI();
+        }
+
+        window.randomizeRules = function() {
+            speciesKeys.forEach(s1 => {
+                speciesKeys.forEach(s2 => {
+                    rules[s1][s2] = ruleStates[Math.floor(Math.random() * ruleStates.length)];
+                });
+            });
+            updateRuleUI();
         };
 
-        // This handles the click
-        function handleNavigation() {
-            window.open(DESTINATION_URL, '_blank');
+        window.toggleRule = function(from, to) {
+            let current = rules[from][to];
+            let nextIndex = (ruleStates.indexOf(current) + 1) % ruleStates.length;
+            rules[from][to] = ruleStates[nextIndex];
+            updateRuleUI();
+        };
+
+        function updateRuleUI() {
+            const headers = `
+                <div class="text-gray-500">Actor\\Target</div>
+                <div class="text-[#00FFFF] font-bold">Blu</div>
+                <div class="text-[#FF3131] font-bold">Red</div>
+                <div class="text-[#39FF14] font-bold">Grn</div>
+                <div class="text-[#FFF01F] font-bold">Yel</div>
+                <div class="text-[#BC13FE] font-bold">Pur</div>
+                <div class="text-[#FF5F1F] font-bold">Org</div>
+            `;
+            
+            let html = headers;
+            speciesKeys.forEach(s1 => {
+                const rowColor = colors[s1];
+                html += `<div style="color: ${rowColor}" class="font-bold text-left capitalize">${s1}</div>`;
+                speciesKeys.forEach(s2 => {
+                    const state = rules[s1][s2];
+                    let cellClass = "rule-cell rounded ";
+                    let cellStyle = "";
+                    
+                    if (state === 'None') {
+                        cellClass += "bg-gray-800 text-gray-500";
+                    } else {
+                        cellStyle = `background-color: ${rowColor}22; color: ${rowColor}; border: 1px solid ${rowColor}44;`;
+                    }
+                    
+                    html += `<div id="rule-${s1}-${s2}" class="${cellClass}" style="${cellStyle}" onclick="toggleRule('${s1}', '${s2}')">${state}</div>`;
+                });
+            });
+            ruleGrid.innerHTML = html;
         }
+
+        window.handleSpeciesToggle = function() {
+            speciesKeys.forEach(k => {
+                activeSpecies[k] = document.getElementById(`check-${k}`).checked;
+            });
+            init(); 
+        };
+
+        class Dot {
+            constructor(x, y, colorKey) {
+                this.x = x;
+                this.y = y;
+                this.radius = 2.5; 
+                this.colorKey = colorKey;
+                this.color = colors[colorKey];
+            }
+            wrap() {
+                if (this.x < 0) this.x += width;
+                if (this.x > width) this.x -= width;
+                if (this.y < 0) this.y += height;
+                if (this.y > height) this.y -= height;
+            }
+        }
+
+        function init() {
+            width = canvas.width = glowCanvas.width = window.innerWidth;
+            height = canvas.height = glowCanvas.height = window.innerHeight;
+            dots = [];
+            isRunning = false;
+            startBtn.innerText = "Start";
+            
+            Object.keys(activeSpecies).forEach(key => {
+                if (activeSpecies[key]) {
+                    for (let i = 0; i < targetCount; i++) {
+                        dots.push(new Dot(Math.random() * width, Math.random() * height, key));
+                    }
+                }
+            });
+        }
+
+        function updatePhysics() {
+            if (!isRunning) return;
+            const len = dots.length;
+            for (let i = 0; i < len; i++) {
+                const d1 = dots[i];
+                let moveX = 0, moveY = 0;
+                for (let j = 0; j < len; j++) {
+                    if (i === j) continue;
+                    const d2 = dots[j];
+                    let dx = d2.x - d1.x, dy = d2.y - d1.y;
+                    
+                    if (Math.abs(dx) > width / 2) dx = dx > 0 ? dx - width : dx + width;
+                    if (Math.abs(dy) > height / 2) dy = dy > 0 ? dy - height : dy + height;
+                    
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < 0.1 || distSq > attractionRange * attractionRange) continue; 
+                    
+                    const dist = Math.sqrt(distSq);
+                    let force = 0;
+                    
+                    const falloff = 1 - (dist / attractionRange);
+                    const behavior = rules[d1.colorKey][d2.colorKey];
+                    
+                    if (behavior === 'Chase') {
+                        force += pullStrength * falloff;
+                    } else if (behavior === 'Flee') {
+                        force -= (pullStrength * 2) * falloff;
+                    }
+                    
+                    if (dist < pushDist) {
+                        force -= (1 - dist / pushDist) * 0.5;
+                    }
+                    
+                    if (force !== 0) {
+                        moveX += (dx / dist) * force;
+                        moveY += (dy / dist) * force;
+                    }
+                }
+                d1.x += moveX; d1.y += moveY;
+                d1.wrap();
+            }
+        }
+
+        function drawParticles(targetCtx) {
+            speciesKeys.forEach(key => {
+                if (!activeSpecies[key]) return;
+                targetCtx.fillStyle = colors[key];
+                targetCtx.beginPath();
+                for (let i = 0; i < dots.length; i++) {
+                    const d = dots[i];
+                    if (d.colorKey === key) {
+                        targetCtx.moveTo(d.x + d.radius, d.y);
+                        targetCtx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+                    }
+                }
+                targetCtx.fill();
+            });
+        }
+
+        function render() {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, width, height);
+
+            if (isNeon) {
+                glowCtx.clearRect(0, 0, width, height);
+                drawParticles(glowCtx);
+
+                ctx.save();
+                ctx.filter = 'blur(6px) brightness(1.5)';
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.drawImage(glowCanvas, 0, 0);
+                ctx.restore();
+
+                ctx.drawImage(glowCanvas, 0, 0);
+            } else {
+                drawParticles(ctx);
+            }
+            
+            requestAnimationFrame(render);
+        }
+
+        setInterval(updatePhysics, 16);
+        
+        window.addEventListener('resize', () => {
+            width = canvas.width = glowCanvas.width = window.innerWidth;
+            height = canvas.height = glowCanvas.height = window.innerHeight;
+        });
+
+        startBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            startBtn.innerText = isRunning ? "Pause" : "Resume";
+        });
+
+        neonToggle.addEventListener('click', () => {
+            isNeon = !isNeon;
+            neonToggle.innerText = isNeon ? "Glow: On" : "Glow: Off";
+            neonToggle.classList.toggle('bg-purple-600', isNeon);
+            neonToggle.classList.toggle('text-white', isNeon);
+        });
+
+        collapseBtn.addEventListener('click', () => {
+            isCollapsed = !isCollapsed;
+            controlPanel.classList.toggle('collapsed', isCollapsed);
+            collapseBtn.innerText = isCollapsed ? "Show Controls" : "Collapse Controls";
+        });
+
+        particleCountInput.addEventListener('input', (e) => {
+            targetCount = parseInt(e.target.value);
+            countValLabel.innerText = targetCount;
+            init(); 
+        });
+
+        strengthInput.addEventListener('input', (e) => {
+            pullStrength = parseFloat(e.target.value);
+            strengthValLabel.innerText = pullStrength.toFixed(3);
+        });
+
+        rangeInput.addEventListener('input', (e) => {
+            attractionRange = parseInt(e.target.value);
+            rangeValLabel.innerText = attractionRange;
+        });
+
+        pushRadiusInput.addEventListener('input', (e) => {
+            pushDist = parseInt(e.target.value);
+            pushValLabel.innerText = pushDist;
+        });
+
+        resetBtn.addEventListener('click', init);
+        
+        initRules();
+        init();
+        render();
     </script>
 </body>
 </html>
