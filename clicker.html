@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gem Miner Idle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes float-up {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.2); }
+        }
+        .animate-float-up { animation: float-up 1s ease-out forwards; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 1); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 1); border-radius: 4px; }
+
+        .gem-glow {
+            filter: drop-shadow(0 0 30px rgba(168, 85, 247, 0.4));
+        }
+        
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-purple-500/30 overflow-hidden flex flex-col md:flex-row">
+
+    <!-- Left Section: Main Interaction -->
+    <div class="flex-1 flex flex-col items-center justify-center p-8 border-b md:border-b-0 md:border-r border-slate-700 bg-slate-800/50 relative shadow-2xl">
+        
+        <!-- Controls & Toast -->
+        <div class="absolute top-4 left-4 flex gap-2 z-20">
+            <button id="saveBtn" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 border border-slate-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            </button>
+            <button id="resetBtn" class="p-2 bg-slate-800 hover:bg-red-900/50 rounded-lg text-slate-500 hover:text-red-400 border border-slate-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+            <div id="saveToast" class="transition-opacity duration-300 flex items-center bg-green-500/20 text-green-400 px-3 rounded-lg border border-green-500/30 opacity-0">
+                <span class="text-xs font-bold">Saved!</span>
+            </div>
+        </div>
+
+        <!-- Stats Display -->
+        <div class="absolute top-16 left-0 right-0 text-center space-y-2 px-4 pointer-events-none z-10">
+            <h1 id="gemDisplay" class="text-5xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
+                0 Gems
+            </h1>
+            <div class="flex justify-center gap-4 text-slate-300 font-medium bg-slate-900/60 inline-flex px-6 py-2 rounded-full border border-slate-700/50 backdrop-blur-sm shadow-xl flex-wrap items-center">
+                <span class="text-sm">/sec: <span id="gpsDisplay" class="text-white font-bold">0</span></span>
+                <span class="w-px h-5 bg-slate-600"></span>
+                <span class="text-sm">/click: <span id="cpcDisplay" class="text-white font-bold">1</span></span>
+                <span id="eyeStat" class="hidden flex items-center gap-1.5 text-rose-400 text-sm font-bold ml-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <span id="eyeValue">0</span> (<span id="eyeMult">x1</span>)
+                </span>
+                <span id="starStat" class="hidden flex items-center gap-1.5 text-cyan-400 text-sm font-bold ml-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/></svg>
+                    <span id="starValue">0</span> (<span id="starMult">x1</span>)
+                </span>
+            </div>
+        </div>
+
+        <!-- Main Clicker -->
+        <button id="mainClicker" class="relative mt-20 group transition-transform duration-75 outline-none z-10 scale-100 active:scale-95 hover:scale-105">
+            <div class="absolute inset-0 bg-purple-500 rounded-full blur-[100px] opacity-30 group-hover:opacity-50 transition-opacity"></div>
+            <div class="relative z-10 p-12 gem-glow">
+                <svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-purple-400 fill-purple-500/20"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l3 12"/><path d="M13 3l3 6-3 12"/><path d="M2 9h20"/></svg>
+            </div>
+        </button>
+
+        <!-- Prestige Buttons -->
+        <div class="absolute bottom-6 left-0 right-0 px-8 flex flex-col items-center gap-3 z-20">
+            <button id="ascendBtn" class="hidden items-center gap-3 px-6 py-2.5 rounded-xl font-bold border-2 w-72 justify-center transition-all bg-slate-900/50 border-slate-700 text-slate-500 opacity-70 cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/></svg>
+                <div class="text-center">
+                    <div class="text-sm uppercase tracking-wider">Ascend</div>
+                    <div id="ascendSubtext" class="text-[10px] font-normal">Requires 1M Eyes</div>
+                </div>
+            </button>
+
+            <button id="rebirthBtn" class="flex items-center gap-3 px-6 py-2.5 rounded-xl font-bold border-2 w-72 justify-center transition-all bg-slate-900/50 border-slate-700 text-slate-500 opacity-70 cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <div class="text-center">
+                    <div class="text-sm uppercase tracking-wider">Seek Vision</div>
+                    <div id="rebirthSubtext" class="text-[10px] font-normal">Requires 1M Gems</div>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Right Section: Shop -->
+    <div class="w-full md:w-96 lg:w-[450px] bg-slate-900 flex flex-col h-screen max-h-screen">
+        <div class="pt-6 px-4 pb-0 bg-slate-800 border-b border-slate-700 shadow-md z-10 flex flex-col">
+            <div class="flex justify-between items-center mb-4 px-2">
+                <h2 class="text-2xl font-bold flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-400"><rect x="2" y="10" width="20" height="12" rx="2"/><path d="M6 4h12"/><path d="M6 10V4"/><path d="M18 10V4"/></svg> Shop</h2>
+                <div id="buyModeContainer" class="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
+                    <button data-mode="1" class="mode-btn px-3 py-1 text-xs font-bold rounded-md bg-purple-500 text-white">x1</button>
+                    <button data-mode="10" class="mode-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-slate-200">x10</button>
+                    <button data-mode="MAX" class="mode-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-slate-200">xMAX</button>
+                </div>
+            </div>
+            <div class="flex gap-1 overflow-x-auto pb-1">
+                <button id="tab-standard" class="tab-btn flex-1 py-2 text-xs font-bold uppercase rounded-t-lg border-b-2 text-purple-400 border-purple-500 bg-slate-700/50">Upgrades</button>
+                <button id="tab-rebirth" class="tab-btn flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold uppercase rounded-t-lg border-b-2 text-slate-400 border-transparent">Eyes</button>
+                <button id="tab-ascension" class="tab-btn hidden flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold uppercase rounded-t-lg border-b-2 text-slate-400 border-transparent">Ascend</button>
+            </div>
+        </div>
+
+        <div id="shopContent" class="flex-1 overflow-y-auto p-4 space-y-3 pb-24 md:pb-4 custom-scrollbar">
+            <!-- Dynamic content injected here -->
+        </div>
+    </div>
+
+    <!-- Golden Gem Template -->
+    <div id="goldenGem" class="hidden fixed z-40 animate-pulse hover:scale-110 transition-transform cursor-pointer drop-shadow-[0_0_15px_rgba(250,204,21,0.8)]">
+        <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-300 fill-yellow-400/50"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+    </div>
+
+    <script>
+        // --- CONSTANTS ---
+        const UPGRADES = [
+            { id: 'cursor', name: 'Auto-Clicker', type: 'idle', baseCost: 15, costMultiplier: 1.15, value: 1, description: 'Automatically clicks for you. (+1 Gem/s)', color: "text-blue-400" },
+            { id: 'pickaxe', name: 'Iron Pickaxe', type: 'click', baseCost: 50, costMultiplier: 1.5, value: 2, description: 'A better tool. (+2 Gems/click)', color: "text-gray-400" },
+            { id: 'miner', name: 'Dwarf Miner', type: 'idle', baseCost: 100, costMultiplier: 1.15, value: 10, description: 'Hires a dwarf. (+10 Gems/s)', color: "text-orange-400" },
+            { id: 'drill', name: 'Power Drill', type: 'idle', baseCost: 1100, costMultiplier: 1.15, value: 25, description: 'A gasoline drill. (+25 Gems/s)', color: "text-red-400" },
+            { id: 'sturdy_wall', name: 'Support Beams', type: 'click', baseCost: 5000, costMultiplier: 1.6, value: 40, description: 'Reinforced walls. (+40 Gems/click)', color: "text-emerald-400" },
+            { id: 'synergy_pickaxe', name: 'Resonance Pickaxe', type: 'synergy', baseCost: 15000, costMultiplier: 1.8, value: 0.01, description: 'Adds 1% of your Gems/s to Click Power.', color: "text-indigo-400" },
+            { id: 'heavy_pickaxe', name: 'Diamond Pickaxe', type: 'click', baseCost: 25000, costMultiplier: 1.5, value: 150, description: 'The ultimate manual tool. (+150 Gems/click)', color: "text-cyan-400" },
+            { id: 'mine_shaft', name: 'Deep Mine Shaft', type: 'idle', baseCost: 45000, costMultiplier: 1.15, value: 150, description: 'Industrial operation. (+150 Gems/s)', color: "text-purple-400" },
+            { id: 'super_charge', name: 'Overclocker', type: 'idle', baseCost: 150000, costMultiplier: 1.18, value: 1200, description: 'Boosts machines. (+1,200 Gems/s)', color: "text-yellow-300" },
+            { id: 'magic_gem', name: 'Magic Core', type: 'idle', baseCost: 1500000, costMultiplier: 1.15, value: 8500, description: 'Pulsating energy. (+8,500 Gems/s)', color: "text-yellow-400" },
+            { id: 'quantum', name: 'Quantum Extractor', type: 'idle', baseCost: 12000000, costMultiplier: 1.15, value: 45000, description: 'Extracts from alt dimensions. (+45k Gems/s)', color: "text-fuchsia-400" },
+            { id: 'planetary', name: 'Planetary Core', type: 'idle', baseCost: 150000000, costMultiplier: 1.15, value: 350000, description: 'Harnesses a planet core. (+350k Gems/s)', color: "text-green-400" },
+            { id: 'galactic', name: 'Galactic Harvester', type: 'idle', baseCost: 5000000000, costMultiplier: 1.15, value: 2500000, description: 'Sweeps star systems. (+2.5M Gems/s)', color: "text-orange-500" },
+            { id: 'singularity', name: 'Cosmic Singularity', type: 'idle', baseCost: 100000000000, costMultiplier: 1.15, value: 50000000, description: 'Black hole forging gems. (+50M Gems/s)', color: "text-purple-600" },
+            { id: 'multiverse_drill', name: 'Multiverse Drill', type: 'idle', baseCost: 5e15, costMultiplier: 1.15, value: 2e12, description: 'Drills through reality itself. (+2T Gems/s)', color: "text-indigo-500" },
+            { id: 'reality_bender', name: 'Reality Bender', type: 'idle', baseCost: 5e24, costMultiplier: 1.15, value: 1e21, description: 'Changes physics to spawn gems. (+1Sx Gems/s)', color: "text-rose-500" },
+            { id: 'omniverse_core', name: 'Omniverse Core', type: 'idle', baseCost: 1e29, costMultiplier: 1.15, value: 5e25, description: 'The center of all existence. (+50Sp Gems/s)', color: "text-emerald-500" }
+        ];
+
+        const REBIRTH_UPGRADES = [
+            { id: 'eye_power', name: 'Ocular Resonance', baseCost: 1, costMultiplier: 2.5, description: 'Eyes give +50% more multiplier per level.', color: 'text-purple-300', maxLevel: null },
+            { id: 'starting_capital', name: 'Inheritance', baseCost: 3, costMultiplier: 3.0, description: 'Start rebirths with 25,000 gems per level.', color: 'text-yellow-400', maxLevel: null },
+            { id: 'golden_luck', name: 'Insight Luck', baseCost: 5, costMultiplier: 4.0, description: 'Golden Gems appear 15% more often per level.', color: 'text-amber-400', maxLevel: 5 }
+        ];
+
+        const ASCENSION_UPGRADES = [
+            { id: 'supernova', name: 'Supernova', baseCost: 1, costMultiplier: 3.0, description: 'Each Ascension Star gives an extra +500% Multiplier.', color: 'text-cyan-300', maxLevel: null },
+            { id: 'eye_mastery', name: 'Eye Duplicator', baseCost: 2, costMultiplier: 4.0, description: 'Double all Eyes earned per level.', color: 'text-green-300', maxLevel: null },
+            { id: 'cosmic_click', name: 'Cosmic Click', baseCost: 5, costMultiplier: 5.0, description: 'Multiplies your base Click Power by x100 per level.', color: 'text-rose-400', maxLevel: null }
+        ];
+
+        // --- STATE ---
+        let gems = 0;
+        let eyes = 0;
+        let stars = 0;
+        let totalGemsEarned = 0;
+        let buyMode = '1';
+        let activeTab = 'standard';
+        let inventory = {};
+        let rebirthInventory = {};
+        let ascensionInventory = {};
+        let cheatForceUnlock = false;
+        
+        // --- UTILS ---
+        const formatNumber = (num) => {
+            if (num < 1000) return Math.floor(num).toString();
+            const map = { Dc: 1e33, No: 1e30, Oc: 1e27, Sp: 1e24, Sx: 1e21, Qi: 1e18, Qa: 1e15, T: 1e12, B: 1e9, M: 1e6 };
+            for (const [s, v] of Object.entries(map)) {
+                if (num >= v) return (num / v).toFixed(2) + s;
+            }
+            return Math.floor(num).toLocaleString();
+        };
+
+        const getBulkInfo = (upgrade, currentCount, wealth) => {
+            const c = upgrade.baseCost * Math.pow(upgrade.costMultiplier, currentCount);
+            const r = upgrade.costMultiplier;
+            if (buyMode === '1') return { amount: 1, cost: c };
+            if (buyMode === '10') return { amount: 10, cost: c * (Math.pow(r, 10) - 1) / (r - 1) };
+            if (buyMode === 'MAX') {
+                if (wealth < c) return { amount: 1, cost: c };
+                const maxAmount = Math.max(1, Math.floor(Math.log(1 + (wealth * (r - 1)) / c) / Math.log(r)));
+                return { amount: maxAmount, cost: c * (Math.pow(r, maxAmount) - 1) / (r - 1) };
+            }
+            return { amount: 1, cost: c };
+        };
+
+        // --- CALCS ---
+        const getStats = () => {
+            const starPowerBonus = 5.0 + ((ascensionInventory.supernova || 0) * 5.0);
+            const ascensionMultiplier = 1 + (stars * starPowerBonus);
+            
+            const eyePowerBonus = 1.0 + ((rebirthInventory.eye_power || 0) * 0.5);
+            const eyeMultiplier = 1 + (eyes * eyePowerBonus);
+
+            const globalMultiplier = eyeMultiplier * ascensionMultiplier;
+
+            const rawIdleCPS = UPGRADES.filter(u => u.type === 'idle').reduce((t, u) => t + (u.value * (inventory[u.id] || 0)), 0);
+            const baseClickRaw = UPGRADES.filter(u => u.type === 'click').reduce((t, u) => t + (u.value * (inventory[u.id] || 0)), 0);
+            const synergyPercent = UPGRADES.filter(u => u.type === 'synergy').reduce((t, u) => t + (u.value * (inventory[u.id] || 0)), 0);
+
+            const cosmicClickMult = Math.pow(100, (ascensionInventory.cosmic_click || 0));
+
+            const gps = rawIdleCPS * globalMultiplier;
+            const cpc = (1 + (baseClickRaw * cosmicClickMult) + (rawIdleCPS * synergyPercent)) * globalMultiplier;
+
+            // Prestigers
+            const eyeDupeMult = Math.pow(2, (ascensionInventory.eye_mastery || 0));
+            const baseEyesToEarn = gems >= 1000000 ? Math.floor(Math.sqrt(gems / 1000000)) : 0;
+            const eyesToEarn = Math.floor(baseEyesToEarn * ascensionMultiplier * eyeDupeMult);
+            const starsToEarn = Math.floor(eyes / 1000000);
+
+            return { gps, cpc, eyeMultiplier, ascensionMultiplier, eyesToEarn, starsToEarn };
+        };
+
+        // --- UI UPDATER ---
+        const updateUI = () => {
+            const s = getStats();
+            document.getElementById('gemDisplay').innerText = `${formatNumber(gems)} Gems`;
+            document.getElementById('gpsDisplay').innerText = formatNumber(s.gps);
+            document.getElementById('cpcDisplay').innerText = formatNumber(s.cpc);
+
+            // Prestige Stats
+            if (eyes > 0 || cheatForceUnlock) {
+                document.getElementById('eyeStat').classList.remove('hidden');
+                document.getElementById('eyeValue').innerText = formatNumber(eyes);
+                document.getElementById('eyeMult').innerText = `x${formatNumber(s.eyeMultiplier)}`;
+                document.getElementById('tab-ascension').classList.remove('hidden');
+            }
+            if (stars > 0 || cheatForceUnlock) {
+                document.getElementById('starStat').classList.remove('hidden');
+                document.getElementById('starValue').innerText = formatNumber(stars);
+                document.getElementById('starMult').innerText = `x${formatNumber(s.ascensionMultiplier)}`;
+            }
+
+            // Buttons
+            const rebirthBtn = document.getElementById('rebirthBtn');
+            if (s.eyesToEarn > 0 || (cheatForceUnlock && gems > 0)) {
+                rebirthBtn.classList.remove('bg-slate-900/50', 'border-slate-700', 'text-slate-500', 'opacity-70', 'cursor-not-allowed');
+                rebirthBtn.classList.add('bg-rose-500/20', 'border-rose-500', 'text-rose-300', 'hover:scale-105');
+                document.getElementById('rebirthSubtext').innerText = `Reset for +${formatNumber(s.eyesToEarn)} Eyes`;
+            } else {
+                rebirthBtn.className = "flex items-center gap-3 px-6 py-2.5 rounded-xl font-bold border-2 w-72 justify-center transition-all bg-slate-900/50 border-slate-700 text-slate-500 opacity-70 cursor-not-allowed";
+                document.getElementById('rebirthSubtext').innerText = "Requires 1M Gems";
+            }
+
+            const ascendBtn = document.getElementById('ascendBtn');
+            if (eyes >= 100000 || stars > 0 || cheatForceUnlock) ascendBtn.classList.remove('hidden');
+            if (s.starsToEarn > 0 || (cheatForceUnlock && eyes > 0)) {
+                ascendBtn.classList.remove('bg-slate-900/50', 'border-slate-700', 'text-slate-500', 'opacity-70', 'cursor-not-allowed');
+                ascendBtn.classList.add('bg-cyan-600/30', 'border-cyan-400', 'text-cyan-300', 'hover:scale-105');
+                document.getElementById('ascendSubtext').innerText = `Reset for +${formatNumber(s.starsToEarn)} Stars`;
+            } else {
+                ascendBtn.className = "hidden items-center gap-3 px-6 py-2.5 rounded-xl font-bold border-2 w-72 justify-center transition-all bg-slate-900/50 border-slate-700 text-slate-500 opacity-70 cursor-not-allowed";
+                if (eyes >= 100000 || stars > 0 || cheatForceUnlock) ascendBtn.classList.remove('hidden');
+                document.getElementById('ascendSubtext').innerText = "Requires 1M Eyes";
+            }
+
+            renderShop();
+        };
+
+        const renderShop = () => {
+            const container = document.getElementById('shopContent');
+            const stats = getStats();
+            let html = '';
+
+            if (activeTab === 'standard') {
+                UPGRADES.forEach(u => {
+                    const count = inventory[u.id] || 0;
+                    const { amount, cost } = getBulkInfo(u, count, gems);
+                    const canAfford = gems >= cost;
+                    html += `
+                    <button onclick="buyUpgrade('${u.id}')" ${!canAfford ? 'disabled' : ''} class="w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${canAfford ? 'bg-slate-800 border-slate-600 hover:border-purple-500' : 'bg-slate-800/50 border-slate-800 opacity-60 grayscale cursor-not-allowed'}">
+                        <div class="p-3 rounded-lg bg-slate-900 flex-shrink-0"><div class="${u.color} font-bold text-xl">#</div></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start"><h3 class="font-bold text-lg truncate">${u.name}</h3><span class="text-2xl font-black text-slate-700 bg-slate-900/50 px-3 py-0.5 rounded-md">${count}</span></div>
+                            <p class="text-xs text-slate-400 mt-0.5">${u.description}</p>
+                            <div class="mt-2 flex items-center justify-between font-semibold">
+                                <div class="flex items-center gap-1.5"><span class="text-purple-400">◆</span><span>${formatNumber(cost)}</span></div>
+                                ${buyMode !== '1' ? `<span class="text-xs text-slate-500 bg-slate-900/80 px-2 py-0.5 rounded">+${formatNumber(amount)}</span>` : ''}
+                            </div>
+                        </div>
+                    </button>`;
+                });
+            } else if (activeTab === 'rebirth') {
+                html += `<div class="mb-4 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-center"><p class="text-xs text-rose-200/80 mb-1">Available Vision (Eyes):</p><p class="text-3xl font-bold text-rose-400 flex items-center justify-center gap-2">👁 ${formatNumber(eyes)}</p></div>`;
+                REBIRTH_UPGRADES.forEach(u => {
+                    const count = rebirthInventory[u.id] || 0;
+                    const cost = Math.floor(u.baseCost * Math.pow(u.costMultiplier, count));
+                    const isMaxed = u.maxLevel !== null && count >= u.maxLevel;
+                    const canAfford = eyes >= cost && !isMaxed;
+                    html += `
+                    <button onclick="buyRebirthUpgrade('${u.id}')" ${!canAfford ? 'disabled' : ''} class="w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${isMaxed ? 'bg-slate-900/80 border-slate-700 opacity-80' : canAfford ? 'bg-slate-800 border-rose-600/50 hover:border-rose-400' : 'bg-slate-800/50 opacity-60 grayscale cursor-not-allowed'}">
+                        <div class="p-3 rounded-lg bg-slate-900 flex-shrink-0 text-xl ${u.color}">★</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start"><h3 class="font-bold text-lg text-rose-100">${u.name}</h3><span class="text-sm font-black text-rose-500/50">${isMaxed ? 'MAX' : `Lvl ${count}`}</span></div>
+                            <p class="text-xs text-slate-400 mt-0.5">${u.description}</p>
+                            <div class="mt-2 font-semibold">
+                                ${!isMaxed ? `👁 ${formatNumber(cost)} Eyes` : `<span class="text-slate-500 text-sm">Full Insight</span>`}
+                            </div>
+                        </div>
+                    </button>`;
+                });
+            } else if (activeTab === 'ascension') {
+                html += `<div class="mb-4 p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-center"><p class="text-xs text-cyan-200/80 mb-2">Cosmic Multiplier:</p><div class="flex justify-center items-center gap-4"><p class="text-3xl font-bold text-cyan-400">✨ ${formatNumber(stars)}</p><p class="text-xl font-bold text-white bg-slate-900/80 px-3 py-1 rounded-lg border border-cyan-500/30">x${formatNumber(stats.ascensionMultiplier)}</p></div></div>`;
+                ASCENSION_UPGRADES.forEach(u => {
+                    const count = ascensionInventory[u.id] || 0;
+                    const cost = Math.floor(u.baseCost * Math.pow(u.costMultiplier, count));
+                    const isMaxed = u.maxLevel !== null && count >= u.maxLevel;
+                    const canAfford = stars >= cost && !isMaxed;
+                    html += `
+                    <button onclick="buyAscensionUpgrade('${u.id}')" ${!canAfford ? 'disabled' : ''} class="w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${isMaxed ? 'bg-slate-900/80 border-slate-700 opacity-80' : canAfford ? 'bg-slate-800 border-cyan-600/50 hover:border-cyan-400' : 'bg-slate-800/50 opacity-60 grayscale'}">
+                        <div class="p-3 rounded-lg bg-slate-900 flex-shrink-0 text-xl ${u.color}">✦</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start"><h3 class="font-bold text-lg text-cyan-100">${u.name}</h3><span class="text-sm font-black text-cyan-500/50">${isMaxed ? 'MAX' : `Lvl ${count}`}</span></div>
+                            <p class="text-xs text-slate-400 mt-0.5">${u.description}</p>
+                            <div class="mt-2 font-semibold">
+                                ${!isMaxed ? `✨ ${formatNumber(cost)} Stars` : `<span class="text-slate-500 text-sm">Godhood Reached</span>`}
+                            </div>
+                        </div>
+                    </button>`;
+                });
+            }
+            container.innerHTML = html;
+        };
+
+        // --- GAME ACTIONS ---
+        const addGems = (amt, x, y, isGolden = false) => {
+            gems += amt;
+            totalGemsEarned += amt;
+            
+            if (x && y) {
+                const el = document.createElement('div');
+                el.className = `pointer-events-none fixed z-50 font-bold animate-float-up ${isGolden ? 'text-4xl text-yellow-300' : 'text-2xl text-white'}`;
+                el.style.left = `${x}px`;
+                el.style.top = `${y}px`;
+                el.innerText = `+${formatNumber(amt)}`;
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 1000);
+            }
+            updateUI();
+        };
+
+        const buyUpgrade = (id) => {
+            const u = UPGRADES.find(x => x.id === id);
+            const { amount, cost } = getBulkInfo(u, inventory[id] || 0, gems);
+            if (gems >= cost) {
+                gems -= cost;
+                inventory[id] = (inventory[id] || 0) + amount;
+                updateUI();
+            }
+        };
+
+        const buyRebirthUpgrade = (id) => {
+            const u = REBIRTH_UPGRADES.find(x => x.id === id);
+            const count = rebirthInventory[id] || 0;
+            const cost = Math.floor(u.baseCost * Math.pow(u.costMultiplier, count));
+            if (eyes >= cost && (u.maxLevel === null || count < u.maxLevel)) {
+                eyes -= cost;
+                rebirthInventory[id] = count + 1;
+                updateUI();
+            }
+        };
+
+        const buyAscensionUpgrade = (id) => {
+            const u = ASCENSION_UPGRADES.find(x => x.id === id);
+            const count = ascensionInventory[id] || 0;
+            const cost = Math.floor(u.baseCost * Math.pow(u.costMultiplier, count));
+            if (stars >= cost && (u.maxLevel === null || count < u.maxLevel)) {
+                stars -= cost;
+                ascensionInventory[id] = count + 1;
+                updateUI();
+            }
+        };
+
+        // --- CORE LOOPS ---
+        setInterval(() => {
+            const s = getStats();
+            if (s.gps > 0) addGems(s.gps / 10);
+        }, 100);
+
+        setInterval(() => {
+            const actualChance = 0.25 + ((rebirthInventory.golden_luck || 0) * 0.15);
+            const golden = document.getElementById('goldenGem');
+            if (golden.classList.contains('hidden') && Math.random() < actualChance) {
+                golden.style.left = `${Math.random() * 80 + 10}%`;
+                golden.style.top = `${Math.random() * 80 + 10}%`;
+                golden.classList.remove('hidden');
+                setTimeout(() => golden.classList.add('hidden'), 6000);
+            }
+        }, 15000);
+
+        // --- CHEAT CODE ---
+        let keyBuffer = "";
+        window.addEventListener('keydown', (e) => {
+            keyBuffer += e.key.toLowerCase();
+            if (keyBuffer.length > 20) keyBuffer = keyBuffer.slice(-20);
+            
+            if (keyBuffer.includes("unlock")) {
+                cheatForceUnlock = true;
+                keyBuffer = "";
+                updateUI();
+            }
+        });
+
+        // --- PERSISTENCE ---
+        const saveGame = (silent = false) => {
+            const state = { gems, eyes, stars, totalGemsEarned, inventory, rebirthInventory, ascensionInventory, cheatForceUnlock };
+            localStorage.setItem('gemMinerJS_Save', JSON.stringify(state));
+            if (!silent) {
+                const toast = document.getElementById('saveToast');
+                toast.style.opacity = '1';
+                setTimeout(() => toast.style.opacity = '0', 2000);
+            }
+        };
+
+        const loadGame = () => {
+            const data = localStorage.getItem('gemMinerJS_Save');
+            if (data) {
+                const p = JSON.parse(data);
+                gems = p.gems || 0;
+                eyes = p.eyes || 0;
+                stars = p.stars || 0;
+                totalGemsEarned = p.totalGemsEarned || 0;
+                inventory = p.inventory || {};
+                rebirthInventory = p.rebirthInventory || {};
+                ascensionInventory = p.ascensionInventory || {};
+                cheatForceUnlock = p.cheatForceUnlock || false;
+            }
+            updateUI();
+        };
+
+        // --- EVENT LISTENERS ---
+        document.getElementById('mainClicker').addEventListener('click', (e) => {
+            addGems(getStats().cpc, e.clientX, e.clientY);
+        });
+
+        document.getElementById('goldenGem').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const bonus = Math.max(getStats().gps * 30, 500);
+            addGems(bonus, e.clientX, e.clientY, true);
+            document.getElementById('goldenGem').classList.add('hidden');
+        });
+
+        document.getElementById('rebirthBtn').addEventListener('click', () => {
+            const s = getStats();
+            if (s.eyesToEarn > 0 || (cheatForceUnlock && gems > 0)) {
+                eyes += s.eyesToEarn;
+                gems = (rebirthInventory.starting_capital || 0) * 25000;
+                inventory = {};
+                saveGame(true);
+                updateUI();
+            }
+        });
+
+        document.getElementById('ascendBtn').addEventListener('click', () => {
+            const s = getStats();
+            if (s.starsToEarn > 0 || (cheatForceUnlock && eyes > 0)) {
+                if (confirm(`Ascend for +${formatNumber(s.starsToEarn)} Stars? This resets everything except Star Shop!`)) {
+                    stars += s.starsToEarn;
+                    eyes = 0;
+                    rebirthInventory = {};
+                    gems = 0;
+                    inventory = {};
+                    activeTab = 'ascension';
+                    saveGame(true);
+                    updateUI();
+                }
+            }
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.id.replace('tab-', '');
+                activeTab = id;
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('text-purple-400', 'border-purple-500', 'bg-slate-700/50', 'text-rose-400', 'border-rose-500', 'text-cyan-400', 'border-cyan-500');
+                    b.classList.add('text-slate-400', 'border-transparent');
+                });
+                
+                const colors = { standard: 'purple', rebirth: 'rose', ascension: 'cyan' };
+                btn.classList.add(`text-${colors[id]}-400`, `border-${colors[id]}-500`, 'bg-slate-700/50');
+                btn.classList.remove('text-slate-400', 'border-transparent');
+                
+                // Hide buy modes for special tabs
+                document.getElementById('buyModeContainer').style.visibility = (id === 'standard') ? 'visible' : 'hidden';
+                updateUI();
+            });
+        });
+
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                buyMode = btn.dataset.mode;
+                document.querySelectorAll('.mode-btn').forEach(b => {
+                    b.classList.remove('bg-purple-500', 'text-white');
+                    b.classList.add('text-slate-400');
+                });
+                btn.classList.add('bg-purple-500', 'text-white');
+                btn.classList.remove('text-slate-400');
+                updateUI();
+            });
+        });
+
+        document.getElementById('saveBtn').addEventListener('click', () => saveGame());
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            if (confirm("Wipe all progress?")) {
+                localStorage.removeItem('gemMinerJS_Save');
+                location.reload();
+            }
+        });
+
+        setInterval(() => saveGame(true), 10000);
+        window.onload = loadGame;
+    </script>
+</body>
+</html>
