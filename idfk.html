@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File to QR Video Exporter</title>
-    <!-- Include QR Code generation library -->
-    <script src="https://cloudflare.com"></script>
+    <!-- Include QR Code generation library (FIXED URL) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f9; color: #333; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -39,6 +39,17 @@
         correctLevel: QRCode.CorrectLevel.L
     });
 
+    // FIX: Safe array buffer to base64 conversion (avoids call stack overflow limits)
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+    }
+
     function generateAndRecordVideo() {
         const fileInput = document.getElementById("fileInput");
         if (fileInput.files.length === 0) {
@@ -46,7 +57,6 @@
             return;
         }
 
-        // FIX: Select the single file object from the file array list
         const file = fileInput.files[0];
         const reader = new FileReader();
 
@@ -54,8 +64,8 @@
             statusText.innerText = "Processing file binary...";
             const arrayBuffer = e.target.result;
             
-            // Convert file data to Base64 string chunking
-            const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            // FIX: Using the safe base64 conversion function
+            const base64Data = arrayBufferToBase64(arrayBuffer);
             const chunkSize = 150; 
             const totalFrames = Math.ceil(base64Data.length / chunkSize);
             
@@ -116,7 +126,6 @@
                 const payload = `${currentFrame}/${totalFrames}|${chunk}`;
                 qrGenerator.makeCode(payload);
 
-                // FIX: Added missing string variable template bracket ($)
                 statusText.innerText = `Recording frame ${currentFrame + 1} of ${totalFrames}...`;
                 currentFrame++;
             }, 100); 
