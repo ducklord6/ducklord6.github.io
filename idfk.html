@@ -3,34 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File to QR Video Exporter</title>
-    <!-- Include QR Code generation library (FIXED URL) -->
+    <title>File to QR Video Encoder & Decoder</title>
+    <!-- QR Code generation library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- QR Code reading library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f9; color: #333; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .container { max-width: 500px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         input, button { margin: 10px 0; padding: 12px; width: 100%; box-sizing: border-box; border-radius: 4px; font-weight: bold; border: 1px solid #ccc; cursor: pointer; }
         button.primary { background-color: #2563eb; color: white; border: none; }
         button.primary:hover { background-color: #1d4ed8; }
+        button.secondary { background-color: #10b981; color: white; border: none; }
+        button.secondary:hover { background-color: #059669; }
         #qrcode { display: flex; justify-content: center; margin-top: 20px; min-height: 256px; background: #fff; padding: 10px; border: 1px dashed #bbb; }
-        #status { font-weight: bold; margin-top: 10px; color: #2563eb; }
+        .status { font-weight: bold; margin-top: 10px; color: #2563eb; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 30px 0; }
     </style>
 </head>
 <body>
 
+<!-- ENCODER SECTION -->
 <div class="container">
-    <h2>File to QR Video Streamer</h2>
-    <p>Select a small file, then click below to render and record it into a video file.</p>
+    <h2>1. File to QR Video</h2>
+    <p>Select a small file (like an image), to encode it into a video.</p>
     <input type="file" id="fileInput">
     <button class="primary" onclick="generateAndRecordVideo()">Record & Download QR Video</button>
-    <div id="status">Ready</div>
+    <div id="encode-status" class="status">Ready</div>
     <div id="qrcode"></div>
 </div>
 
+<!-- DECODER SECTION -->
+<div class="container">
+    <h2>2. Video back to File</h2>
+    <p>Upload the recorded .webm video to reconstruct the original file.</p>
+    <input type="file" id="videoInput" accept="video/*">
+    <button class="secondary" onclick="decodeVideo()">Scan Video & Restore File</button>
+    <div id="decode-status" class="status">Ready</div>
+</div>
+
 <script>
-    // Initialize the QR generator library immediately on page load
+    /* =========================================
+       ENCODER LOGIC (File -> Video)
+       ========================================= */
     const qrContainer = document.getElementById("qrcode");
-    const statusText = document.getElementById("status");
+    const encodeStatus = document.getElementById("encode-status");
     
     const qrGenerator = new QRCode(qrContainer, {
         text: "INITIALIZING",
@@ -39,7 +56,6 @@
         correctLevel: QRCode.CorrectLevel.L
     });
 
-    // FIX: Safe array buffer to base64 conversion (avoids call stack overflow limits)
     function arrayBufferToBase64(buffer) {
         let binary = '';
         const bytes = new Uint8Array(buffer);
@@ -61,28 +77,24 @@
         const reader = new FileReader();
 
         reader.onload = async function(e) {
-            statusText.innerText = "Processing file binary...";
+            encodeStatus.innerText = "Processing file binary...";
             const arrayBuffer = e.target.result;
             
-            // FIX: Using the safe base64 conversion function
             const base64Data = arrayBufferToBase64(arrayBuffer);
             const chunkSize = 150; 
             const totalFrames = Math.ceil(base64Data.length / chunkSize);
             
-            statusText.innerText = `Preparing recording for ${totalFrames} frames...`;
+            encodeStatus.innerText = `Preparing recording for ${totalFrames} frames...`;
 
-            // Identify the canvas element generated inside the container
             const canvas = qrContainer.querySelector('canvas');
             if (!canvas) {
-                statusText.innerText = "Error: Canvas element not ready.";
+                encodeStatus.innerText = "Error: Canvas element not ready.";
                 return;
             }
 
-            // Capture canvas frames at 10 frames per second
             const stream = canvas.captureStream(10);
             const recordedChunks = [];
             
-            // Fallback checking for browser support
             let options = { mimeType: 'video/webm; codecs=vp9' };
             if (!MediaRecorder.isTypeSupported(options.mimeType)) {
                 options = { mimeType: 'video/webm' };
@@ -105,7 +117,7 @@
                 a.click();
                 document.body.removeChild(a);
                 
-                statusText.innerText = "Download Complete!";
+                encodeStatus.innerText = "Download Complete!";
             };
 
             mediaRecorder.start();
@@ -122,16 +134,141 @@
                 const end = Math.min(start + chunkSize, base64Data.length);
                 const chunk = base64Data.slice(start, end);
 
-                // Format metadata packet: index/total|payload
+                // Format: index/total|payload
                 const payload = `${currentFrame}/${totalFrames}|${chunk}`;
                 qrGenerator.makeCode(payload);
 
-                statusText.innerText = `Recording frame ${currentFrame + 1} of ${totalFrames}...`;
+                encodeStatus.innerText = `Recording frame ${currentFrame + 1} of ${totalFrames}...`;
                 currentFrame++;
             }, 100); 
         };
 
         reader.readAsArrayBuffer(file);
+    }
+
+    /* =========================================
+       DECODER LOGIC (Video -> File)
+       ========================================= */
+    const decodeStatus = document.getElementById("decode-status");
+
+    function decodeVideo() {
+        const videoInput = document.getElementById("videoInput");
+        if (videoInput.files.length === 0) {
+            alert("Please select a video file first!");
+            return;
+        }
+
+        decodeStatus.innerText = "Loading video...";
+        const videoFile = videoInput.files[0];
+        
+        // Create hidden video element to play back the recording
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(videoFile);
+        video.muted = true;
+        
+        // Create hidden canvas to extract video frames
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        let chunks = {}; // Store frames by index
+        let totalFramesExpected = null;
+        let isDone = false;
+
+        video.addEventListener('play', () => {
+            decodeStatus.innerText = "Scanning frames...";
+            
+            const scanFrame = () => {
+                if (isDone || video.paused || video.ended) return;
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                // Scan the frame for a QR code
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    // Split our payload format: index/total|payload
+                    const parts = code.data.split('|');
+                    if (parts.length === 2) {
+                        const header = parts[0];
+                        const data = parts[1];
+                        const headerParts = header.split('/');
+                        
+                        if (headerParts.length === 2) {
+                            const current = parseInt(headerParts[0]);
+                            const total = parseInt(headerParts[1]);
+                            
+                            if (!chunks[current]) {
+                                chunks[current] = data;
+                                totalFramesExpected = total;
+                                decodeStatus.innerText = `Scanned ${Object.keys(chunks).length} of ${totalFramesExpected} unique frames...`;
+                            }
+
+                            // Check if we collected every frame
+                            if (Object.keys(chunks).length === totalFramesExpected) {
+                                isDone = true;
+                                video.pause();
+                                reassembleAndDownload(chunks, totalFramesExpected);
+                                return;
+                            }
+                        }
+                    }
+                }
+                
+                // Request next frame
+                requestAnimationFrame(scanFrame);
+            };
+            
+            requestAnimationFrame(scanFrame);
+        });
+
+        video.addEventListener('ended', () => {
+            if (!isDone) {
+                decodeStatus.innerText = `Error: Video ended. Only got ${Object.keys(chunks).length} / ${totalFramesExpected} frames. Video might have dropped frames during recording.`;
+            }
+        });
+
+        video.play();
+    }
+
+    function reassembleAndDownload(chunks, totalFrames) {
+        decodeStatus.innerText = "Reassembling base64 data...";
+        let fullBase64 = '';
+        
+        for (let i = 0; i < totalFrames; i++) {
+            fullBase64 += chunks[i];
+        }
+
+        try {
+            // Convert Base64 back to binary Blob
+            const byteCharacters = atob(fullBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            
+            // We use a generic stream type because we didn't save the MIME type in the QR code
+            const blob = new Blob([byteArray], {type: "application/octet-stream"});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Note: because the metadata isn't saved, we default to unknown extension. 
+            // If you only use images, you can change this to "restored_file.png" or ".jpg"
+            a.download = "restored_file"; 
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            decodeStatus.innerText = "File restored successfully! (Note: You may need to add the correct file extension like .png or .jpg to the downloaded file)";
+        } catch (e) {
+            decodeStatus.innerText = "Error rebuilding file: " + e.message;
+        }
     }
 </script>
 
