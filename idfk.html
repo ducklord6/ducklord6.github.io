@@ -3,44 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File to Flashing QR Stream</title>
+    <title>File to QR Video Exporter</title>
     <!-- Include QR Code generation library -->
     <script src="https://cloudflare.com"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f9; color: #333; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        input, button { margin: 10px 0; padding: 10px; width: 100%; box-sizing: border-box; }
-        #qrcode { display: flex; justify-content: center; margin-top: 20px; min-height: 256px; }
-        #status { font-weight: bold; color: #333; margin-top: 10px; }
+        input, button { margin: 10px 0; padding: 12px; width: 100%; box-sizing: border-box; border-radius: 4px; font-weight: bold; border: 1px solid #ccc; cursor: pointer; }
+        button.primary { background-color: #2563eb; color: white; border: none; }
+        button.primary:hover { background-color: #1d4ed8; }
+        #qrcode { display: flex; justify-content: center; margin-top: 20px; min-height: 256px; background: #fff; padding: 10px; border: 1px dashed #bbb; }
+        #status { font-weight: bold; margin-top: 10px; color: #2563eb; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>File to QR Stream</h2>
-    <p>Select any small file to turn it into a flashing QR data stream.</p>
+    <h2>File to QR Video Streamer</h2>
+    <p>Select a small file, then click below to render and record it into a video file.</p>
     <input type="file" id="fileInput">
-    <button onclick="startStream()">Generate & Flash QR Stream</button>
+    <button class="primary" onclick="generateAndRecordVideo()">Record & Download QR Video</button>
     <div id="status">Ready</div>
     <div id="qrcode"></div>
 </div>
 
 <script>
-    let intervalId = null;
     const qrContainer = document.getElementById("qrcode");
     const statusText = document.getElementById("status");
 
-    // Initialize the QR Code generator library inside our container
+    // Initialize the QR generator library
     const qrGenerator = new QRCode(qrContainer, {
         width: 256,
         height: 256,
         correctLevel: QRCode.CorrectLevel.L // Low error correction for maximum data capacity
     });
 
-    function startStream() {
-        // Clear any running loops
-        if (intervalId) clearInterval(intervalId);
-        
+    function generateAndRecordVideo() {
         const fileInput = document.getElementById("fileInput");
         if (fileInput.files.length === 0) {
             alert("Please select a file first!");
@@ -50,36 +48,77 @@
         const file = fileInput.files[0];
         const reader = new FileReader();
 
-        reader.onload = function(e) {
+        reader.onload = async function(e) {
+            statusText.innerText = "Processing file binary...";
             const arrayBuffer = e.target.result;
-            // Convert file binary data into a standard clean base64 string
-            const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
             
-            // Settings: Break the string into 150-character chunks
+            // Convert file data to Base64 string chunking
+            const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
             const chunkSize = 150; 
             const totalFrames = Math.ceil(base64Data.length / chunkSize);
+            
+            statusText.innerText = `Preparing recording for ${totalFrames} frames...`;
+
+            // Identify the canvas element generated inside the container by qrcode.js
+            const canvas = qrContainer.querySelector('canvas');
+            if (!canvas) {
+                // Generate a dummy code to force library to initialize the canvas element
+                qrGenerator.makeCode("init");
+                setTimeout(generateAndRecordVideo, 50);
+                return;
+            }
+
+            // Capture the live canvas visual element as a video stream at 10 frames per second
+            const stream = canvas.captureStream(10);
+            
+            // Set up browser media recorder (Uses standard WebM container containing high-compatibility H264/VP8 video)
+            const recordedChunks = [];
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) recordedChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                // Compile the data chunks into a downloadable file stream
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                // Create a temporary link to automatically trigger the browser download save prompt
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${file.name}_qr_stream.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                statusText.innerText = "Download Complete!";
+            };
+
+            // Start the actual recording sequence
+            mediaRecorder.start();
+
             let currentFrame = 0;
+            const intervalId = setInterval(() => {
+                if (currentFrame >= totalFrames) {
+                    clearInterval(intervalId);
+                    mediaRecorder.stop(); // Stop recording when last chunk finishes
+                    return;
+                }
 
-            statusText.innerText = `Streaming ${totalFrames} frames...`;
-
-            // Start flashing the QR codes sequentially (10 frames per second)
-            intervalId = setInterval(() => {
                 const start = currentFrame * chunkSize;
                 const end = Math.min(start + chunkSize, base64Data.length);
                 const chunk = base64Data.slice(start, end);
 
-                // Build packet header: [Current Frame]/[Total Frames]|[Payload Data]
+                // Format metadata packet: index/total|payload
                 const payload = `${currentFrame}/${totalFrames}|${chunk}`;
-
-                // Update the visible QR code
                 qrGenerator.makeCode(payload);
 
-                // Move to next frame or loop back to the beginning
-                currentFrame = (currentFrame + 1) % totalFrames;
-            }, 100); // 100ms = 10 frames per second
+                statusText.innerText = `Recording frame ${currentFrame + 1} of {totalFrames}...`;
+                currentFrame++;
+            }, 100); // Flashes every 100ms (10 FPS)
         };
 
-        // Read the file as an array buffer to catch raw bytes
         reader.readAsArrayBuffer(file);
     }
 </script>
