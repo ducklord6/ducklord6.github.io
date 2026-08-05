@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File to Flashing QR Stream</title>
+    <!-- Include QR Code generation library -->
+    <script src="https://cloudflare.com"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        input, button { margin: 10px 0; padding: 10px; width: 100%; box-sizing: border-box; }
+        #qrcode { display: flex; justify-content: center; margin-top: 20px; min-height: 256px; }
+        #status { font-weight: bold; color: #333; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>File to QR Stream</h2>
+    <p>Select any small file to turn it into a flashing QR data stream.</p>
+    <input type="file" id="fileInput">
+    <button onclick="startStream()">Generate & Flash QR Stream</button>
+    <div id="status">Ready</div>
+    <div id="qrcode"></div>
+</div>
+
+<script>
+    let intervalId = null;
+    const qrContainer = document.getElementById("qrcode");
+    const statusText = document.getElementById("status");
+
+    // Initialize the QR Code generator library inside our container
+    const qrGenerator = new QRCode(qrContainer, {
+        width: 256,
+        height: 256,
+        correctLevel: QRCode.CorrectLevel.L // Low error correction for maximum data capacity
+    });
+
+    function startStream() {
+        // Clear any running loops
+        if (intervalId) clearInterval(intervalId);
+        
+        const fileInput = document.getElementById("fileInput");
+        if (fileInput.files.length === 0) {
+            alert("Please select a file first!");
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            const arrayBuffer = e.target.result;
+            // Convert file binary data into a standard clean base64 string
+            const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            
+            // Settings: Break the string into 150-character chunks
+            const chunkSize = 150; 
+            const totalFrames = Math.ceil(base64Data.length / chunkSize);
+            let currentFrame = 0;
+
+            statusText.innerText = `Streaming ${totalFrames} frames...`;
+
+            // Start flashing the QR codes sequentially (10 frames per second)
+            intervalId = setInterval(() => {
+                const start = currentFrame * chunkSize;
+                const end = Math.min(start + chunkSize, base64Data.length);
+                const chunk = base64Data.slice(start, end);
+
+                // Build packet header: [Current Frame]/[Total Frames]|[Payload Data]
+                const payload = `${currentFrame}/${totalFrames}|${chunk}`;
+
+                // Update the visible QR code
+                qrGenerator.makeCode(payload);
+
+                // Move to next frame or loop back to the beginning
+                currentFrame = (currentFrame + 1) % totalFrames;
+            }, 100); // 100ms = 10 frames per second
+        };
+
+        // Read the file as an array buffer to catch raw bytes
+        reader.readAsArrayBuffer(file);
+    }
+</script>
+
+</body>
+</html>
