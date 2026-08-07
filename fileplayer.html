@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Media Player</title>
+    <title>Persistent Media Player</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -44,9 +44,14 @@
         }
         button:hover { background-color: #0056b3; }
         button:disabled { background-color: #555; cursor: not-allowed; }
-        input[type="file"] {
-            margin-bottom: 15px;
+        .delete-btn {
+            background-color: #dc3545;
+            padding: 4px 8px;
+            font-size: 0.8em;
+            margin-left: 10px;
         }
+        .delete-btn:hover { background-color: #c82333; }
+        input[type="file"] { margin-bottom: 15px; }
         .segment-controls {
             background-color: #3d3d3d;
             padding: 10px;
@@ -55,6 +60,7 @@
             gap: 10px;
             align-items: center;
             width: 100%;
+            box-sizing: border-box;
         }
         .segment-controls input[type="number"] {
             width: 60px;
@@ -64,13 +70,11 @@
             background: #2d2d2d;
             color: white;
         }
-        .playlist-container {
-            margin-top: 20px;
-        }
+        .playlist-container { margin-top: 20px; }
         .playlist {
             list-style: none;
             padding: 0;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
             background: #3d3d3d;
             border-radius: 5px;
@@ -78,22 +82,30 @@
         .playlist li {
             padding: 10px;
             border-bottom: 1px solid #444;
-            cursor: pointer;
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
         .playlist li:hover { background-color: #4d4d4d; }
         .playlist li.active { background-color: #007bff; font-weight: bold; }
+        .track-info {
+            cursor: pointer;
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .note { font-size: 0.85em; color: #aaa; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Media Player</h2>
-    <p class="note">Upload files to add them to your session playlist. (Note: Browsers cannot permanently save file paths after you close the tab for security reasons, but they will stay here while the page is open).</p>
+    <h2>Offline Media Player</h2>
+    <p class="note">Files uploaded here are saved directly to your browser's local database. They will still be here if you refresh the page or close the tab.</p>
     
     <input type="file" id="fileInput" multiple accept="video/*, audio/*">
+    <span id="loadingMsg" style="display:none; color: #007bff; font-size: 0.9em;">Saving to database...</span>
     
     <video id="mediaPlayer" controls playsinline>
         Your browser does not support the video tag.
@@ -108,83 +120,173 @@
     </div>
 
     <div class="segment-controls">
-        <strong>Custom Segment:</strong>
-        <label>Start (sec): <input type="number" id="startTime" min="0" step="1"></label>
-        <label>End (sec): <input type="number" id="endTime" min="0" step="1"></label>
-        <label>
-            <input type="checkbox" id="loopSegmentCheck"> Loop Segment
-        </label>
+        <strong>Segment:</strong>
+        <label>Start (s): <input type="number" id="startTime" min="0" step="1"></label>
+        <label>End (s): <input type="number" id="endTime" min="0" step="1"></label>
+        <label><input type="checkbox" id="loopSegmentCheck"> Loop</label>
     </div>
 
     <div class="playlist-container">
-        <h3>Playlist</h3>
+        <h3>Saved Playlist</h3>
         <ul class="playlist" id="playlist"></ul>
     </div>
 </div>
 
 <script>
+    // --- Database Setup (IndexedDB) ---
+    let db;
+    const dbName = "MediaStorage";
+    const storeName = "files";
+    
+    const request = indexedDB.open(dbName, 1);
+    
+    request.onupgradeneeded = (e) => {
+        db = e.target.result;
+        if (!db.objectStoreNames.contains(storeName)) {
+            db.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
+        }
+    };
+    
+    request.onsuccess = (e) => {
+        db = e.target.result;
+        loadPlaylistFromDB(); // Load files when page opens
+    };
+    
+    request.onerror = (e) => {
+        console.error("Database error: ", e.target.errorCode);
+    };
+
+    // --- Media Player Logic ---
     const fileInput = document.getElementById('fileInput');
+    const loadingMsg = document.getElementById('loadingMsg');
     const mediaPlayer = document.getElementById('mediaPlayer');
     const playlistEl = document.getElementById('playlist');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const autoplayCheck = document.getElementById('autoplayCheck');
-    
     const startTimeInput = document.getElementById('startTime');
     const endTimeInput = document.getElementById('endTime');
     const loopSegmentCheck = document.getElementById('loopSegmentCheck');
 
-    let playlist = [];
+    let playlist = []; // Array to hold database records
     let currentIndex = -1;
+    let currentObjectURL = null; // Used to clean up memory
 
-    // Handle File Uploads
-    fileInput.addEventListener('change', (e) => {
+    // Handle new file uploads
+    fileInput.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        const startIndex = playlist.length;
-        playlist = playlist.concat(files);
+        loadingMsg.style.display = 'inline';
         
-        renderPlaylist();
-
-        // If nothing is playing, play the first newly added file
-        if (currentIndex === -1) {
-            loadMedia(startIndex);
+        for (const file of files) {
+            await saveFileToDB(file);
         }
         
-        updateButtons();
-        // Reset file input so you can upload the same file again if desired
+        loadingMsg.style.display = 'none';
         fileInput.value = ''; 
+        loadPlaylistFromDB(true); // reload and play new files
     });
 
-    // Render Playlist UI
+    // Save a single file to IndexedDB
+    function saveFileToDB(file) {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
+            const record = { name: file.name, type: file.type, data: file };
+            
+            const request = store.add(record);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // Load all saved files from the database
+    function loadPlaylistFromDB(playLatest = false) {
+        const transaction = db.transaction([storeName], "readonly");
+        const store = transaction.objectStore(storeName);
+        const request = store.getAll();
+
+        request.onsuccess = (e) => {
+            playlist = e.target.result;
+            renderPlaylist();
+            
+            // Auto-play the newly added file if requested, or play first file if nothing is playing
+            if (playlist.length > 0) {
+                if (playLatest) {
+                    loadMedia(playlist.length - 1);
+                } else if (currentIndex === -1) {
+                    updateButtons();
+                }
+            } else {
+                mediaPlayer.src = "";
+                currentIndex = -1;
+                updateButtons();
+            }
+        };
+    }
+
+    // Delete a file from database
+    function deleteFile(id, index) {
+        const transaction = db.transaction([storeName], "readwrite");
+        const store = transaction.objectStore(storeName);
+        store.delete(id);
+        
+        transaction.oncomplete = () => {
+            // If deleting the currently playing track, stop it
+            if (index === currentIndex) {
+                mediaPlayer.src = "";
+                currentIndex = -1;
+            } else if (index < currentIndex) {
+                currentIndex--; // Adjust index so next/prev buttons still work
+            }
+            loadPlaylistFromDB();
+        };
+    }
+
+    // Draw the playlist on the screen
     function renderPlaylist() {
         playlistEl.innerHTML = '';
-        playlist.forEach((file, index) => {
+        playlist.forEach((item, index) => {
             const li = document.createElement('li');
-            li.textContent = file.name;
-            if (index === currentIndex) {
-                li.classList.add('active');
-            }
-            li.addEventListener('click', () => loadMedia(index));
+            if (index === currentIndex) li.classList.add('active');
+            
+            const trackInfo = document.createElement('div');
+            trackInfo.className = 'track-info';
+            trackInfo.textContent = item.name;
+            trackInfo.addEventListener('click', () => loadMedia(index));
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.textContent = '✖';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent clicking delete from playing the track
+                deleteFile(item.id, index);
+            });
+
+            li.appendChild(trackInfo);
+            li.appendChild(deleteBtn);
             playlistEl.appendChild(li);
         });
     }
 
-    // Load Media by Index
+    // Play a specific index from the playlist
     function loadMedia(index) {
         if (index < 0 || index >= playlist.length) return;
-        
         currentIndex = index;
-        const file = playlist[index];
+        const item = playlist[index];
         
-        // Create an object URL to play local files without a server
-        const fileURL = URL.createObjectURL(file);
+        // Clean up old object URL to prevent memory leaks
+        if (currentObjectURL) {
+            URL.revokeObjectURL(currentObjectURL);
+        }
         
-        mediaPlayer.src = fileURL;
+        // Create new link from the stored Blob/File data
+        currentObjectURL = URL.createObjectURL(item.data);
+        mediaPlayer.src = currentObjectURL;
         mediaPlayer.play();
         
-        // Reset segment controls on new track
+        // Reset custom segments
         startTimeInput.value = '';
         endTimeInput.value = '';
         loopSegmentCheck.checked = false;
@@ -193,13 +295,11 @@
         updateButtons();
     }
 
-    // Update Next/Prev Button States
     function updateButtons() {
         prevBtn.disabled = currentIndex <= 0;
         nextBtn.disabled = currentIndex >= playlist.length - 1;
     }
 
-    // Next / Prev Actions
     prevBtn.addEventListener('click', () => {
         if (currentIndex > 0) loadMedia(currentIndex - 1);
     });
@@ -208,28 +308,24 @@
         if (currentIndex < playlist.length - 1) loadMedia(currentIndex + 1);
     });
 
-    // Autoplay functionality
     mediaPlayer.addEventListener('ended', () => {
         if (autoplayCheck.checked && currentIndex < playlist.length - 1) {
             loadMedia(currentIndex + 1);
         }
     });
 
-    // Custom Start/End Position & Looping Logic
+    // Custom Segment Looping
     mediaPlayer.addEventListener('timeupdate', () => {
         if (!loopSegmentCheck.checked) return;
-
         const startTime = parseFloat(startTimeInput.value) || 0;
         const endTime = parseFloat(endTimeInput.value) || mediaPlayer.duration;
 
-        // If the current time hits or passes the end time, loop back to start
         if (mediaPlayer.currentTime >= endTime && endTime > startTime) {
             mediaPlayer.currentTime = startTime;
             mediaPlayer.play();
         }
     });
 
-    // Ensure we start playing at the custom start time when the user clicks 'Play'
     mediaPlayer.addEventListener('play', () => {
         if (loopSegmentCheck.checked) {
             const startTime = parseFloat(startTimeInput.value) || 0;
