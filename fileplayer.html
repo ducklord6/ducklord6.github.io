@@ -52,6 +52,25 @@
         }
         .delete-btn:hover { background-color: #c82333; }
         input[type="file"] { margin-bottom: 15px; }
+        
+        /* New styling for the speaker selector */
+        .device-selector {
+            background-color: #3d3d3d;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        select {
+            background-color: #2d2d2d;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
         .segment-controls {
             background-color: #3d3d3d;
             padding: 10px;
@@ -107,6 +126,14 @@
     <input type="file" id="fileInput" multiple accept="video/*, audio/*">
     <span id="loadingMsg" style="display:none; color: #007bff; font-size: 0.9em;">Saving to database...</span>
     
+    <div class="device-selector">
+        <strong>Speaker:</strong>
+        <select id="speakerSelect">
+            <option value="">Default Speaker</option>
+        </select>
+        <button id="loadSpeakersBtn" style="padding: 4px 8px; font-size: 0.8em;">Load Devices</button>
+    </div>
+
     <video id="mediaPlayer" controls playsinline>
         Your browser does not support the video tag.
     </video>
@@ -133,6 +160,66 @@
 </div>
 
 <script>
+    // --- Audio Routing Logic ---
+    const speakerSelect = document.getElementById('speakerSelect');
+    const loadSpeakersBtn = document.getElementById('loadSpeakersBtn');
+    const mediaPlayer = document.getElementById('mediaPlayer');
+
+    // Load available audio output devices
+    async function loadAudioDevices() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+            alert("Your browser does not support checking audio devices.");
+            return;
+        }
+
+        try {
+            // Browsers require permission to see device names, so we briefly request audio access
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+            
+            speakerSelect.innerHTML = ''; // Clear old list
+            
+            if (audioOutputs.length === 0) {
+                const option = document.createElement('option');
+                option.text = "No speakers found";
+                speakerSelect.appendChild(option);
+                return;
+            }
+
+            audioOutputs.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Speaker ${speakerSelect.length + 1}`;
+                speakerSelect.appendChild(option);
+            });
+            
+            loadSpeakersBtn.style.display = 'none'; // Hide button once loaded
+
+        } catch (err) {
+            console.error("Error accessing audio devices:", err);
+            alert("Please allow microphone permissions so the browser can see your speaker names.");
+        }
+    }
+
+    // Change the output when you pick a new dropdown item
+    speakerSelect.addEventListener('change', async (e) => {
+        const deviceId = e.target.value;
+        if (typeof mediaPlayer.setSinkId === 'function') {
+            try {
+                await mediaPlayer.setSinkId(deviceId);
+            } catch (error) {
+                console.error('Error routing audio:', error);
+                alert("Failed to change speaker.");
+            }
+        } else {
+            alert('Your browser does not support routing audio to specific speakers.');
+        }
+    });
+
+    loadSpeakersBtn.addEventListener('click', loadAudioDevices);
+
     // --- Database Setup (IndexedDB) ---
     let db;
     const dbName = "MediaStorage";
@@ -149,17 +236,12 @@
     
     request.onsuccess = (e) => {
         db = e.target.result;
-        loadPlaylistFromDB(); // Load files when page opens
-    };
-    
-    request.onerror = (e) => {
-        console.error("Database error: ", e.target.errorCode);
+        loadPlaylistFromDB(); 
     };
 
     // --- Media Player Logic ---
     const fileInput = document.getElementById('fileInput');
     const loadingMsg = document.getElementById('loadingMsg');
-    const mediaPlayer = document.getElementById('mediaPlayer');
     const playlistEl = document.getElementById('playlist');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
@@ -168,11 +250,10 @@
     const endTimeInput = document.getElementById('endTime');
     const loopSegmentCheck = document.getElementById('loopSegmentCheck');
 
-    let playlist = []; // Array to hold database records
+    let playlist = []; 
     let currentIndex = -1;
-    let currentObjectURL = null; // Used to clean up memory
+    let currentObjectURL = null; 
 
-    // Handle new file uploads
     fileInput.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -185,10 +266,9 @@
         
         loadingMsg.style.display = 'none';
         fileInput.value = ''; 
-        loadPlaylistFromDB(true); // reload and play new files
+        loadPlaylistFromDB(true); 
     });
 
-    // Save a single file to IndexedDB
     function saveFileToDB(file) {
         return new Promise((resolve, reject) => {
             const transaction = db.transaction([storeName], "readwrite");
@@ -201,17 +281,15 @@
         });
     }
 
-    // Load all saved files from the database
     function loadPlaylistFromDB(playLatest = false) {
         const transaction = db.transaction([storeName], "readonly");
         const store = transaction.objectStore(storeName);
-        const request = store.getAll();
+        const req = store.getAll();
 
-        request.onsuccess = (e) => {
+        req.onsuccess = (e) => {
             playlist = e.target.result;
             renderPlaylist();
             
-            // Auto-play the newly added file if requested, or play first file if nothing is playing
             if (playlist.length > 0) {
                 if (playLatest) {
                     loadMedia(playlist.length - 1);
@@ -226,25 +304,22 @@
         };
     }
 
-    // Delete a file from database
     function deleteFile(id, index) {
         const transaction = db.transaction([storeName], "readwrite");
         const store = transaction.objectStore(storeName);
         store.delete(id);
         
         transaction.oncomplete = () => {
-            // If deleting the currently playing track, stop it
             if (index === currentIndex) {
                 mediaPlayer.src = "";
                 currentIndex = -1;
             } else if (index < currentIndex) {
-                currentIndex--; // Adjust index so next/prev buttons still work
+                currentIndex--; 
             }
             loadPlaylistFromDB();
         };
     }
 
-    // Draw the playlist on the screen
     function renderPlaylist() {
         playlistEl.innerHTML = '';
         playlist.forEach((item, index) => {
@@ -260,7 +335,7 @@
             deleteBtn.className = 'delete-btn';
             deleteBtn.textContent = '✖';
             deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent clicking delete from playing the track
+                e.stopPropagation(); 
                 deleteFile(item.id, index);
             });
 
@@ -270,23 +345,25 @@
         });
     }
 
-    // Play a specific index from the playlist
     function loadMedia(index) {
         if (index < 0 || index >= playlist.length) return;
         currentIndex = index;
         const item = playlist[index];
         
-        // Clean up old object URL to prevent memory leaks
         if (currentObjectURL) {
             URL.revokeObjectURL(currentObjectURL);
         }
         
-        // Create new link from the stored Blob/File data
         currentObjectURL = URL.createObjectURL(item.data);
         mediaPlayer.src = currentObjectURL;
+        
+        // Ensure the current speaker is maintained when a new track loads
+        if (typeof mediaPlayer.setSinkId === 'function' && speakerSelect.value) {
+            mediaPlayer.setSinkId(speakerSelect.value).catch(e => console.error(e));
+        }
+        
         mediaPlayer.play();
         
-        // Reset custom segments
         startTimeInput.value = '';
         endTimeInput.value = '';
         loopSegmentCheck.checked = false;
@@ -314,7 +391,6 @@
         }
     });
 
-    // Custom Segment Looping
     mediaPlayer.addEventListener('timeupdate', () => {
         if (!loopSegmentCheck.checked) return;
         const startTime = parseFloat(startTimeInput.value) || 0;
