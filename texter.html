@@ -100,7 +100,6 @@
     </div>
 
     <script>
-        // Rows mapped out into arrays to allow calculating mathematical offsets (gaps)
         const rows = [
             ['q','w','e','r','t','y','u','i','o','p'],
             ['a','s','d','f','g','h','j','k','l'],
@@ -111,7 +110,6 @@
         const outputTextArea = document.getElementById('output');
         const gapInput = document.getElementById('gapInput');
 
-        // Logic to shift a single character based on the row array index and user gap selection
         function shiftChar(char, gap) {
             const isUpper = char === char.toUpperCase() && char !== char.toLowerCase();
             const lowerChar = char.toLowerCase();
@@ -119,13 +117,12 @@
             for (let row of rows) {
                 const index = row.indexOf(lowerChar);
                 if (index !== -1) {
-                    // Loop around the specific row array using the remainder operator
                     const newIndex = (index + gap) % row.length;
                     const shifted = row[newIndex];
                     return isUpper ? shifted.toUpperCase() : shifted;
                 }
             }
-            return char; // Return unchanged if it is a number or punctuation symbol
+            return char;
         }
 
         function processText() {
@@ -138,28 +135,25 @@
                 .join('');
         }
 
-        // Event listeners to handle real-time changes
         inputTextArea.addEventListener('input', processText);
         gapInput.addEventListener('input', processText);
 
-        // Paste functionality using standard Web Clipboard API
         async function pasteToInput() {
             try {
                 const text = await navigator.clipboard.readText();
                 inputTextArea.value = text;
                 processText();
             } catch (err) {
-                alert('Failed to read clipboard. Please allow clipboard permissions.');
+                console.error('Failed to read clipboard:', err);
             }
         }
 
-        // Copy functionality using standard Web Clipboard API
         async function copyOutput() {
             try {
                 await navigator.clipboard.writeText(outputTextArea.value);
-                alert('Shifted text copied to clipboard!');
+                // Alert removed for silent copying
             } catch (err) {
-                alert('Failed to copy text.');
+                console.error('Failed to copy text:', err);
             }
         }
     </script>
