@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Keyboard Shifter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #121212;
+            color: #ffffff;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #222;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 15px 0;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        button {
+            background-color: #5865F2;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            flex: 1;
+        }
+        button:hover {
+            background-color: #4752C4;
+        }
+        button.secondary {
+            background-color: #4f545c;
+        }
+        button.secondary:hover {
+            background-color: #686d73;
+        }
+        input[type="number"] {
+            width: 60px;
+            padding: 8px;
+            background-color: #222;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-size: 16px;
+            text-align: center;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 15px;
+        }
+        .gap-label {
+            margin-top: 0;
+            display: inline;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Keyboard Character Shifter</h2>
+    
+    <div class="controls">
+        <label class="gap-label" for="gapInput">Shift Gap (Keys to the right):</label>
+        <input type="number" id="gapInput" value="1" min="1" max="9">
+    </div>
+
+    <label for="input">Input Text:</label>
+    <textarea id="input" placeholder="Type or paste normal text here..."></textarea>
+    
+    <div class="btn-group">
+        <button class="secondary" onclick="pasteToInput()">Paste into Input</button>
+    </div>
+    
+    <label for="output">Shifted Output:</label>
+    <textarea id="output" placeholder="Shifted text will appear here..." readonly></textarea>
+    
+    <div class="btn-group">
+        <button onclick="copyOutput()">Copy Output</button>
+    </div>
+
+    <script>
+        // Rows mapped out into arrays to allow calculating mathematical offsets (gaps)
+        const rows = [
+            ['q','w','e','r','t','y','u','i','o','p'],
+            ['a','s','d','f','g','h','j','k','l'],
+            ['z','x','c','v','b','n','m']
+        ];
+
+        const inputTextArea = document.getElementById('input');
+        const outputTextArea = document.getElementById('output');
+        const gapInput = document.getElementById('gapInput');
+
+        // Logic to shift a single character based on the row array index and user gap selection
+        function shiftChar(char, gap) {
+            const isUpper = char === char.toUpperCase() && char !== char.toLowerCase();
+            const lowerChar = char.toLowerCase();
+
+            for (let row of rows) {
+                const index = row.indexOf(lowerChar);
+                if (index !== -1) {
+                    // Loop around the specific row array using the remainder operator
+                    const newIndex = (index + gap) % row.length;
+                    const shifted = row[newIndex];
+                    return isUpper ? shifted.toUpperCase() : shifted;
+                }
+            }
+            return char; // Return unchanged if it is a number or punctuation symbol
+        }
+
+        function processText() {
+            const rawText = inputTextArea.value;
+            const gap = parseInt(gapInput.value, 10) || 1;
+            
+            outputTextArea.value = rawText
+                .split('')
+                .map(char => shiftChar(char, gap))
+                .join('');
+        }
+
+        // Event listeners to handle real-time changes
+        inputTextArea.addEventListener('input', processText);
+        gapInput.addEventListener('input', processText);
+
+        // Paste functionality using standard Web Clipboard API
+        async function pasteToInput() {
+            try {
+                const text = await navigator.clipboard.readText();
+                inputTextArea.value = text;
+                processText();
+            } catch (err) {
+                alert('Failed to read clipboard. Please allow clipboard permissions.');
+            }
+        }
+
+        // Copy functionality using standard Web Clipboard API
+        async function copyOutput() {
+            try {
+                await navigator.clipboard.writeText(outputTextArea.value);
+                alert('Shifted text copied to clipboard!');
+            } catch (err) {
+                alert('Failed to copy text.');
+            }
+        }
+    </script>
+
+</body>
+</html>
