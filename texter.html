@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Keyboard Shifter</title>
+    <title>Continuous Keyboard Shifter</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -82,7 +82,7 @@
     
     <div class="controls">
         <label class="gap-label" for="gapInput">Shift Gap (Keys to the right):</label>
-        <input type="number" id="gapInput" value="1" min="1" max="9">
+        <input type="number" id="gapInput" value="1" min="1" max="25">
     </div>
 
     <label for="input">Input Text:</label>
@@ -100,10 +100,11 @@
     </div>
 
     <script>
-        const rows = [
-            ['q','w','e','r','t','y','u','i','o','p'],
-            ['a','s','d','f','g','h','j','k','l'],
-            ['z','x','c','v','b','n','m']
+        // All 26 letters linked in a continuous layout stream (p loops to a, l loops to z, m loops back to q)
+        const alphabetChain = [
+            'q','w','e','r','t','y','u','i','o','p', // Top row
+            'a','s','d','f','g','h','j','k','l',     // Middle row
+            'z','x','c','v','b','n','m'              // Bottom row
         ];
 
         const inputTextArea = document.getElementById('input');
@@ -114,15 +115,14 @@
             const isUpper = char === char.toUpperCase() && char !== char.toLowerCase();
             const lowerChar = char.toLowerCase();
 
-            for (let row of rows) {
-                const index = row.indexOf(lowerChar);
-                if (index !== -1) {
-                    const newIndex = (index + gap) % row.length;
-                    const shifted = row[newIndex];
-                    return isUpper ? shifted.toUpperCase() : shifted;
-                }
+            const index = alphabetChain.indexOf(lowerChar);
+            if (index !== -1) {
+                // Loops cleanly across the entire 26-character chain based on chosen gap value
+                const newIndex = (index + gap) % alphabetChain.length;
+                const shifted = alphabetChain[newIndex];
+                return isUpper ? shifted.toUpperCase() : shifted;
             }
-            return char;
+            return char; // Keeps spaces, numbers, and symbols exactly as they are
         }
 
         function processText() {
@@ -151,7 +151,6 @@
         async function copyOutput() {
             try {
                 await navigator.clipboard.writeText(outputTextArea.value);
-                // Alert removed for silent copying
             } catch (err) {
                 console.error('Failed to copy text:', err);
             }
