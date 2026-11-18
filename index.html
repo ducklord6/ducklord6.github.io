@@ -73,9 +73,37 @@
         .collapsed .hide-when-collapsed {
             display: none;
         }
+        .download-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 11;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: rgba(15, 15, 15, 0.95);
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .download-btn:hover {
+            background: #1f1f1f;
+            border-color: #555555;
+        }
     </style>
 </head>
 <body>
+
+    <a class="download-btn" id="downloadBtn" href="https://raw.githubusercontent.com/ducklord6/ducklord6.github.io/main/dotgame2.zip" download="dotgame2.zip" rel="noopener">
+        <span>&#8595;</span> dot game 2 download now
+    </a>
 
     <div id="controlPanel" class="controls shadow-2xl">
         <div class="flex justify-between items-start mb-1">
@@ -451,6 +479,62 @@
         initRules();
         init();
         render();
+    </script>
+
+    <script>
+        // Force a real file download (no navigation/redirect) by fetching the zip
+        // as a blob and saving it through an object URL.
+        (function () {
+            const btn = document.getElementById('downloadBtn');
+            if (!btn) return;
+
+            const url = btn.getAttribute('href');
+            const fileName = btn.getAttribute('download') || 'dotgame2.zip';
+            const label = btn.innerHTML;
+
+            function saveBlob(blob) {
+                const objectUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objectUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 10000);
+            }
+
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                btn.style.pointerEvents = 'none';
+                btn.innerHTML = '<span>&#8595;</span> downloading';
+
+                fetch(url, { cache: 'no-store' })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        return res.blob();
+                    })
+                    .then(function (blob) {
+                        saveBlob(blob);
+                        btn.innerHTML = '<span>&#10003;</span> downloaded';
+                    })
+                    .catch(function () {
+                        // Last resort: same-origin download attribute, no new tab.
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        btn.innerHTML = label;
+                    })
+                    .finally(function () {
+                        setTimeout(function () {
+                            btn.innerHTML = label;
+                            btn.style.pointerEvents = '';
+                        }, 2000);
+                    });
+            });
+        })();
     </script>
 </body>
 </html>
